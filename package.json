@@ -1,0 +1,77 @@
+{
+  "name": "@jpstale/pt-loader",
+  "version": "0.1.0",
+  "description": "Loader for Priston Tale 3D assets (SMD / SMB / INX / encrypted BMP & TGA) targeting three.js. Pure ESM, no build step, three.js as a peer dependency.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Julio Facal",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FaKL-Code/pt-loader.git"
+  },
+  "homepage": "https://github.com/FaKL-Code/pt-loader#readme",
+  "bugs": {
+    "url": "https://github.com/FaKL-Code/pt-loader/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./core": {
+      "types": "./types/core.d.ts",
+      "import": "./src/core.js"
+    },
+    "./viewer": {
+      "types": "./types/viewer.d.ts",
+      "import": "./src/viewer.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./types/index.d.ts",
+  "bin": {
+    "pt-assets": "./bin/cli.js"
+  },
+  "files": [
+    "src",
+    "bin",
+    "types",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "three": ">=0.152.0"
+  },
+  "peerDependenciesMeta": {
+    "three": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run format:check && npm test && npm pack --dry-run",
+    "prepublishOnly": "npm run format:check && npm test"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6",
+    "three": "^0.180.0"
+  },
+  "keywords": [
+    "priston-tale",
+    "three",
+    "threejs",
+    "smd",
+    "loader",
+    "game-assets",
+    "webgl"
+  ]
+}

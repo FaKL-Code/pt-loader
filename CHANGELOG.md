@@ -1,0 +1,26 @@
+# Changelog
+
+All notable changes to this project will be documented in this file. The
+format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
+the project follows [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+## [0.1.0] - 2026-09-11
+
+### Added
+
+- Pure ESM loaders for PAT3D models, STAGE3D maps, SMB skeletons and INX motion
+  indices.
+- BMP and TGA decoding, including the header obfuscation used by game assets.
+- three.js builders for static meshes, maps, skeletons and animation clips.
+- `PTLoader` high-level API and the batteries-included `PTViewer`.
+- Surface picking, shared-texture discovery and animated highlight overlays.
+- Collision-only geometry extraction.
+- Optional Web Worker parsing for large maps.
+- `pt-assets` CLI for inspection, decryption, texture conversion and manifest
+  generation.
+- TypeScript declarations and a 68-test suite.
+
+[Unreleased]: https://github.com/FaKL-Code/pt-loader/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/FaKL-Code/pt-loader/releases/tag/v0.1.0
