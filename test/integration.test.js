@@ -172,3 +172,58 @@ test('end to end: concurrent requests for the same file are deduplicated', async
 
   loader.dispose();
 });
+
+test('requestInit applies authorization to models and textures', async () => {
+  const server = makeFakeServer();
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, init });
+    return server.fetchImpl(url);
+  };
+  const loader = new PTLoader({
+    baseUrl: '/pt-assets/',
+    manifest: server.manifest,
+    fetch: fetchImpl,
+    requestInit: async ({ path, kind }) => ({
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { Authorization: `Asset ${kind}:${path}` },
+    }),
+  });
+
+  await loader.loadModel('items/it0123.smd');
+
+  const model = calls.find(({ url }) => url.endsWith('it0123.smd'));
+  const texture = calls.find(({ url }) => url.endsWith('test.bmp'));
+  assert.ok(model, 'model request was captured');
+  assert.ok(texture, 'texture request was captured');
+  assert.equal(model.init.credentials, 'include');
+  assert.equal(model.init.cache, 'no-store');
+  assert.equal(model.init.headers.Authorization, 'Asset model:items/it0123.smd');
+  assert.equal(texture.init.headers.Authorization, 'Asset texture:items/test.bmp');
+
+  loader.dispose();
+});
+
+test('an authorization failure is evicted so loading can retry after login', async () => {
+  const server = makeFakeServer();
+  let authorized = false;
+  const fetchImpl = async (url) => {
+    if (!authorized) {
+      return { ok: false, status: 401, arrayBuffer: async () => new ArrayBuffer(0) };
+    }
+    return server.fetchImpl(url);
+  };
+  const loader = new PTLoader({
+    baseUrl: '/pt-assets/',
+    manifest: server.manifest,
+    fetch: fetchImpl,
+  });
+
+  await assert.rejects(loader.loadModel('items/it0123.smd'), /HTTP 401/);
+  authorized = true;
+  const model = await loader.loadModel('items/it0123.smd');
+  assert.equal(model.isGroup, true);
+
+  loader.dispose();
+});

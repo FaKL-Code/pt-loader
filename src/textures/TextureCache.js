@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { decodeImage, NATIVE_EXTENSIONS } from './decode.js';
 import { resolveAssetPath, baseOf } from '../util/paths.js';
+import { fetchAsset } from '../io/fetch.js';
 
 /**
  * Loads, decrypts, decodes and caches Priston Tale textures.
@@ -18,6 +19,9 @@ export class TextureCache {
    * @param {Record<string,string>|Map<string,string>|null} [opts.manifest]
    *   lower-cased logical path -> real path; see `pt-assets manifest`
    * @param {typeof fetch} [opts.fetch] custom fetch (proxies, auth, Node)
+   * @param {RequestInit|((context: {url:string, path:string, kind:string}) =>
+   *   RequestInit|Promise<RequestInit>)} [opts.requestInit] fetch options,
+   *   evaluated per request when supplied as a callback
    * @param {number} [opts.anisotropy=4]
    * @param {number} [opts.maxSize=4096] downscale above this; 0 disables
    * @param {boolean} [opts.warnMissing=true]
@@ -26,6 +30,7 @@ export class TextureCache {
     baseUrl = '',
     manifest = null,
     fetch: fetchImpl = undefined,
+    requestInit = undefined,
     anisotropy = 4,
     maxSize = 4096,
     warnMissing = true,
@@ -33,6 +38,7 @@ export class TextureCache {
     this.baseUrl = baseUrl;
     this.manifest = manifest;
     this.fetch = fetchImpl ?? ((...a) => globalThis.fetch(...a));
+    this.requestInit = requestInit;
     this.anisotropy = anisotropy;
     this.maxSize = maxSize;
     this.warnMissing = warnMissing;
@@ -95,6 +101,11 @@ export class TextureCache {
     });
 
     this.cache.set(key, promise);
+    promise.then((texture) => {
+      // Missing includes 401/403 responses. Let a later request retry after the
+      // user logs in or a short-lived token has been refreshed.
+      if (texture === this._missing && this.cache.get(key) === promise) this.cache.delete(key);
+    });
     return promise;
   }
 
@@ -102,7 +113,7 @@ export class TextureCache {
     if (!resolved) throw new Error('not present in manifest');
 
     const url = this.baseUrl + resolved;
-    const res = await this.fetch(url);
+    const res = await fetchAsset(this.fetch, url, resolved, 'texture', this.requestInit);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const buffer = await res.arrayBuffer();
 

@@ -21,6 +21,9 @@ export class PTViewer {
    * @param {object} [opts]
    * @param {string} [opts.baseUrl='']
    * @param {Record<string,string>|null} [opts.manifest]
+   * @param {typeof fetch} [opts.fetch] custom fetch implementation
+   * @param {RequestInit|Function} [opts.requestInit] authorization options for
+   *   every model and texture request
    * @param {PTLoader} [opts.loader] reuse an existing loader
    * @param {number|string|null} [opts.background=null] null keeps it transparent
    * @param {boolean} [opts.autoRotate=false]
@@ -35,6 +38,8 @@ export class PTViewer {
     {
       baseUrl = '',
       manifest = null,
+      fetch: fetchImpl = undefined,
+      requestInit = undefined,
       loader = null,
       background = null,
       autoRotate = false,
@@ -50,7 +55,8 @@ export class PTViewer {
     if (!el) throw new Error(`pt-loader: PTViewer target "${target}" not found`);
     this.container = el;
 
-    this.loader = loader ?? new PTLoader({ baseUrl, manifest, options });
+    this.loader =
+      loader ?? new PTLoader({ baseUrl, manifest, fetch: fetchImpl, requestInit, options });
     this.autoRotate = autoRotate;
     this.autoRotateSpeed = autoRotateSpeed;
 

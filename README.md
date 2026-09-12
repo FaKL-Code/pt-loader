@@ -8,8 +8,8 @@ Load Priston Tale 3D assets — `.smd` models and maps, `.smb` skeletons, `.inx`
 animation indices, and the game's obfuscated BMP/TGA textures — directly in the
 browser with [three.js](https://threejs.org).
 
-Pure ESM. No build step. `three` is a peer dependency, nothing else is required.
-No game assets are included.
+Published as minified ESM without source maps. `three` is a peer dependency and
+no game assets are included.
 
 ```js
 import { PTLoader } from '@jpstale/pt-loader';
@@ -25,6 +25,7 @@ scene.add(await loader.loadModel('image/Sinimage/Items/DropItem/it0123.smd'));
 - [Install](#install)
 - [Step 1 — prepare the assets](#step-1--prepare-the-assets) ← **do not skip**
 - [Step 2 — use the loader](#step-2--use-the-loader)
+- [Protecting models and textures](#protecting-models-and-textures)
 - [Picking surfaces](#f-picking-a-surface-the-texture-picker)
 - [API](#api)
 - [Build options](#build-options)
@@ -98,8 +99,10 @@ Use `/core` inside a Web Worker, in Node, or in tests.
 **This step is mandatory.** Skipping it produces a site that works locally and
 breaks in production.
 
-Copy the game's asset folders (`image/`, `char/`, `field/`, …) somewhere your
-server serves them — for example `public/pt-assets/` — then run:
+Copy the game's asset folders (`image/`, `char/`, `field/`, …) to an asset
+directory. If the files are private, keep that directory **outside** the web
+server's public/static root and expose it only through an authenticated route.
+Then run:
 
 ```bash
 # 1. Convert textures to PNG. Decrypts the BMP/TGA headers, cuts download size,
@@ -187,6 +190,74 @@ await viewer.show('image/Sinimage/Items/DropItem/it0123.smd');
 
 The container element must have a non-zero size — `PTViewer` fills it. Call
 `viewer.dispose()` when the component unmounts.
+
+### Protecting models and textures
+
+Browser-side code cannot make a rendered asset impossible to extract: an
+authorized browser must receive the model bytes and upload the decoded texture
+to the GPU. DevTools will therefore always show that a request happened, and a
+determined authorized user can capture the response. Encryption or obfuscation
+with a key shipped to the browser only makes that process less convenient.
+
+What can and should be enforced is **server-side access control**. Do not place
+private assets under `public/`, a public bucket, or a CDN URL that works without
+credentials. Route every manifest, model, skeleton, animation and texture
+request through a backend that:
+
+1. authenticates the session and checks that it may read the requested asset;
+2. rejects traversal and maps an allow-listed logical path to a file/object;
+3. returns `401` or `403` when the check fails;
+4. sends `Cache-Control: private, no-store` and `X-Content-Type-Options: nosniff`;
+5. uses an HttpOnly, Secure, SameSite session cookie when possible.
+
+`requestInit` is applied to **every** request made by `PTLoader`, including
+textures. For a same-origin backend with an HttpOnly session cookie:
+
+```js
+const protectedRequest = {
+  credentials: 'same-origin',
+  cache: 'no-store',
+};
+
+const manifest = await PTLoader.loadManifest(
+  '/api/pt-assets/manifest.json',
+  fetch,
+  protectedRequest,
+);
+
+const loader = new PTLoader({
+  baseUrl: '/api/pt-assets/',
+  manifest,
+  requestInit: protectedRequest,
+});
+```
+
+The callback form is evaluated immediately before each request and supports
+short-lived tokens:
+
+```js
+const loader = new PTLoader({
+  baseUrl: '/api/pt-assets/',
+  manifest,
+  requestInit: async ({ path, kind }) => ({
+    cache: 'no-store',
+    headers: { Authorization: `Bearer ${await getAssetToken(path, kind)}` },
+  }),
+});
+```
+
+After logout, call `loader.dispose()` and ensure the backend invalidates the
+session/token. CORS and `Referer` checks are useful supporting controls, but are
+not authorization by themselves.
+
+#### Published JavaScript and source maps
+
+The npm package exposes minified files from `dist/`, does not publish `src/`,
+and emits no `.map` files or `sourceMappingURL` comments. Your application build
+can still create its own source map, so keep source maps disabled in the site's
+production bundler configuration. DevTools can always display and pretty-print
+the JavaScript actually delivered to the browser; minification reduces source
+disclosure but is not a security boundary.
 
 ### C. An animated character
 
@@ -322,14 +393,15 @@ are still findable, which is the point of the sibling highlight.
 
 ### `new PTLoader(options)`
 
-| Option         | Type                    | Default | Meaning                          |
-| -------------- | ----------------------- | ------- | -------------------------------- |
-| `baseUrl`      | `string`                | `''`    | Prefix for every request         |
-| `manifest`     | `object \| Map \| null` | `null`  | Output of `pt-assets manifest`   |
-| `fetch`        | `typeof fetch`          | global  | Custom fetch (proxy, auth, Node) |
-| `textureCache` | `TextureCache`          | new one | Share a cache between loaders    |
-| `useWorker`    | `boolean`               | `false` | Parse off the main thread        |
-| `options`      | `PTBuildOptions`        | `{}`    | Defaults for every build         |
+| Option         | Type                    | Default | Meaning                        |
+| -------------- | ----------------------- | ------- | ------------------------------ |
+| `baseUrl`      | `string`                | `''`    | Prefix for every request       |
+| `manifest`     | `object \| Map \| null` | `null`  | Output of `pt-assets manifest` |
+| `fetch`        | `typeof fetch`          | global  | Custom fetch implementation    |
+| `requestInit`  | `object \| function`    | —       | Auth options for every asset   |
+| `textureCache` | `TextureCache`          | new one | Share a cache between loaders  |
+| `useWorker`    | `boolean`               | `false` | Parse off the main thread      |
+| `options`      | `PTBuildOptions`        | `{}`    | Defaults for every build       |
 
 **Methods**
 
@@ -370,8 +442,8 @@ without touching the model files.
 ### `new PTViewer(target, options)`
 
 `target` is an element or a CSS selector. Options: `baseUrl`, `manifest`,
-`loader`, `background`, `autoRotate`, `autoRotateSpeed`, `grid`, `fov`,
-`exposure`, `options`.
+`fetch`, `requestInit`, `loader`, `background`, `autoRotate`,
+`autoRotateSpeed`, `grid`, `fov`, `exposure`, `options`.
 
 | Method / property                                    | Meaning                                                   |
 | ---------------------------------------------------- | --------------------------------------------------------- |
@@ -561,6 +633,19 @@ material rules, skinning, the rotation-delta accumulation, and surface picking.
 are caught before release. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the
 architecture rules and pull-request checklist. Security reports belong in a
 [private advisory](./SECURITY.md), not a public issue.
+
+## Contributing and support
+
+Contributions are welcome through reviewed pull requests. Read the
+[contribution guide](./CONTRIBUTING.md) and [governance policy](./GOVERNANCE.md)
+before starting a change. Usage questions belong in
+[GitHub Discussions](https://github.com/FaKL-Code/pt-loader/discussions), while
+the issue tracker uses structured forms for reproducible bugs and feature
+requests. See [SUPPORT.md](./SUPPORT.md) for details.
+
+GitHub Sponsors support is configured through `.github/FUNDING.yml`; the
+Sponsor button becomes available when the maintainer's Sponsors profile is
+active.
 
 ## License
 

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 import { parsePAT3D, parseSTAGE3D, parseINX } from './core.js';
 import { TextureCache } from './textures/TextureCache.js';
+import { fetchAsset } from './io/fetch.js';
 import { buildModel, buildStage, buildCollisionMesh } from './build/model.js';
 import { buildClips } from './build/animation.js';
 import { pickAt } from './build/picking.js';
@@ -64,6 +65,9 @@ export class PTLoader {
    *   output of `pt-assets manifest`; strongly recommended — without it,
    *   texture lookups are case-sensitive and will break in production
    * @param {typeof fetch} [opts.fetch] custom fetch implementation
+   * @param {RequestInit|((context: {url:string, path:string, kind:string}) =>
+   *   RequestInit|Promise<RequestInit>)} [opts.requestInit] static or dynamic
+   *   fetch options; use this for credentials and authorization headers
    * @param {TextureCache} [opts.textureCache] bring your own cache
    * @param {boolean} [opts.useWorker=false] parse off the main thread
    * @param {object} [opts.options] defaults for every build; see `buildModel`
@@ -72,6 +76,7 @@ export class PTLoader {
     baseUrl = '',
     manifest = null,
     fetch: fetchImpl = undefined,
+    requestInit = undefined,
     textureCache = null,
     useWorker = false,
     options = {},
@@ -79,9 +84,12 @@ export class PTLoader {
     this.baseUrl = baseUrl;
     this.manifest = manifest;
     this.fetch = fetchImpl ?? ((...a) => globalThis.fetch(...a));
+    this.requestInit = requestInit;
     this.options = options;
     this.textures =
-      textureCache ?? new TextureCache({ baseUrl, manifest, fetch: this.fetch, ...options });
+      textureCache ??
+      new TextureCache({ ...options, baseUrl, manifest, fetch: this.fetch, requestInit });
+    if (textureCache && requestInit !== undefined) textureCache.requestInit = requestInit;
 
     this.useWorker = useWorker;
     this._worker = null;
@@ -95,8 +103,8 @@ export class PTLoader {
   }
 
   /** Fetch and cache a manifest produced by `pt-assets manifest`. */
-  static async loadManifest(url, fetchImpl = globalThis.fetch) {
-    const res = await fetchImpl(url);
+  static async loadManifest(url, fetchImpl = globalThis.fetch, requestInit = undefined) {
+    const res = await fetchAsset(fetchImpl, url, url, 'manifest', requestInit);
     if (!res.ok) throw new Error(`pt-loader: manifest ${url} -> HTTP ${res.status}`);
     return res.json();
   }
@@ -112,20 +120,26 @@ export class PTLoader {
   /**
    * Fetch an asset as an `ArrayBuffer`, deduplicating concurrent requests.
    * @param {string} path relative to `baseUrl`
+   * @param {'asset'|'model'|'stage'|'animation'} [kind='asset'] request kind
    */
-  fetchBuffer(path) {
+  fetchBuffer(path, kind = 'asset') {
     const p = normalize(path);
     let hit = this._buffers.get(p);
     if (hit) return hit;
 
     const job = (async () => {
       const real = this.#resolve(p);
-      const res = await this.fetch(this.baseUrl + real);
+      const res = await fetchAsset(this.fetch, this.baseUrl + real, real, kind, this.requestInit);
       if (!res.ok) throw new Error(`pt-loader: ${real} -> HTTP ${res.status}`);
       return res.arrayBuffer();
     })();
 
     this._buffers.set(p, job);
+    job.catch(() => {
+      // A 401/403 may become valid after login or token refresh. Do not poison
+      // the cache permanently with a rejected authorization request.
+      if (this._buffers.get(p) === job) this._buffers.delete(p);
+    });
     return job;
   }
 
@@ -140,17 +154,17 @@ export class PTLoader {
 
   /** Parse a `.smd` model or a `.smb` skeleton. */
   async parsePAT3D(path) {
-    return this.#parse('pat3d', await this.fetchBuffer(path));
+    return this.#parse('pat3d', await this.fetchBuffer(path, 'model'));
   }
 
   /** Parse a `.smd` map. */
   async parseSTAGE3D(path) {
-    return this.#parse('stage3d', await this.fetchBuffer(path));
+    return this.#parse('stage3d', await this.fetchBuffer(path, 'stage'));
   }
 
   /** Parse an `.inx` animation index. */
   async parseINX(path) {
-    return this.#parse('inx', await this.fetchBuffer(path));
+    return this.#parse('inx', await this.fetchBuffer(path, 'animation'));
   }
 
   async #parse(kind, buffer) {

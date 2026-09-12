@@ -6,6 +6,14 @@ the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-11
+
+### Added
+
+- Per-request credentials and authorization headers for protected assets.
+- Minified production bundles without source maps or published source files.
+- Retry behavior after asset authorization failures and package-content checks.
+
 ## [0.1.0] - 2026-09-11
 
 ### Added
@@ -22,5 +30,6 @@ the project follows [Semantic Versioning](https://semver.org/).
   generation.
 - TypeScript declarations and a 68-test suite.
 
-[Unreleased]: https://github.com/FaKL-Code/pt-loader/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/FaKL-Code/pt-loader/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/FaKL-Code/pt-loader/releases/tag/v0.1.1
 [0.1.0]: https://github.com/FaKL-Code/pt-loader/releases/tag/v0.1.0

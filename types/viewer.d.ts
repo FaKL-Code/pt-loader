@@ -10,6 +10,7 @@ import type {
 } from 'three';
 import type {
   PTBuildOptions,
+  PTAssetRequestInit,
   PTCharacter,
   PTHighlight,
   PTHighlightOptions,
@@ -20,6 +21,9 @@ import type {
 export interface PTViewerOptions {
   baseUrl?: string;
   manifest?: Record<string, string> | null;
+  fetch?: typeof fetch;
+  /** Authorization credentials/headers for every model and texture request. */
+  requestInit?: PTAssetRequestInit;
   /** Reuse an existing loader instead of creating one. */
   loader?: PTLoader;
   /** `null` (default) keeps the canvas transparent. */

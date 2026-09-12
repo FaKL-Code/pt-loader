@@ -1,7 +1,7 @@
 {
   "name": "@jpstale/pt-loader",
-  "version": "0.1.0",
-  "description": "Loader for Priston Tale 3D assets (SMD / SMB / INX / encrypted BMP & TGA) targeting three.js. Pure ESM, no build step, three.js as a peer dependency.",
+  "version": "0.1.1",
+  "description": "Loader for Priston Tale 3D assets (SMD / SMB / INX / encrypted BMP & TGA) targeting three.js.",
   "type": "module",
   "license": "MIT",
   "author": "Julio Facal",
@@ -23,25 +23,24 @@
   "exports": {
     ".": {
       "types": "./types/index.d.ts",
-      "import": "./src/index.js"
+      "import": "./dist/index.js"
     },
     "./core": {
       "types": "./types/core.d.ts",
-      "import": "./src/core.js"
+      "import": "./dist/core.js"
     },
     "./viewer": {
       "types": "./types/viewer.d.ts",
-      "import": "./src/viewer.js"
+      "import": "./dist/viewer.js"
     },
     "./package.json": "./package.json"
   },
   "types": "./types/index.d.ts",
   "bin": {
-    "pt-assets": "./bin/cli.js"
+    "pt-assets": "./dist/cli.js"
   },
   "files": [
-    "src",
-    "bin",
+    "dist",
     "types",
     "README.md",
     "LICENSE"
@@ -55,13 +54,17 @@
     }
   },
   "scripts": {
-    "test": "node --test test/build.test.js test/cli.test.js test/core.test.js test/integration.test.js test/picking.test.js",
+    "build": "node scripts/build.js",
+    "test": "npm run build && node --test test/build.test.js test/cli.test.js test/core.test.js test/integration.test.js test/package.test.js test/picking.test.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run format:check && npm test && npm pack --dry-run",
+    "prepare": "npm run build",
+    "prepack": "npm run build",
     "prepublishOnly": "npm run format:check && npm test"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "prettier": "^3.9.6",
     "three": "^0.180.0"
   },

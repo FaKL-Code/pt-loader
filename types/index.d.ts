@@ -635,10 +635,31 @@ export const UNIT_SCALE: number;
 // Texture cache
 // ===========================================================================
 
+export type PTAssetKind = 'asset' | 'model' | 'stage' | 'animation' | 'texture' | 'manifest';
+
+export interface PTAssetRequestContext {
+  /** Fully resolved URL that will be passed to `fetch`. */
+  url: string;
+  /** Manifest-resolved asset path. */
+  path: string;
+  kind: PTAssetKind;
+}
+
+export type PTAssetRequestInit =
+  | RequestInit
+  | ((
+      context: PTAssetRequestContext,
+    ) => RequestInit | undefined | Promise<RequestInit | undefined>);
+
 export interface TextureCacheOptions {
   baseUrl?: string;
   manifest?: Record<string, string> | Map<string, string> | null;
   fetch?: typeof fetch;
+  /**
+   * Static or per-request fetch options. Use the callback form for short-lived
+   * authorization headers. Applied to textures as well as model resources.
+   */
+  requestInit?: PTAssetRequestInit;
   anisotropy?: number;
   /** Downscale textures above this size. `0` disables. Default `4096`. */
   maxSize?: number;
@@ -649,6 +670,7 @@ export class TextureCache {
   constructor(options?: TextureCacheOptions);
   baseUrl: string;
   manifest: Record<string, string> | Map<string, string> | null;
+  requestInit?: PTAssetRequestInit;
   /** Magenta checker used whenever a texture cannot be resolved. */
   readonly missingTexture: Texture;
   /** Never rejects: unresolved names resolve to `missingTexture`. */
@@ -677,6 +699,8 @@ export interface PTLoaderOptions {
   /** Output of `pt-assets manifest`. Strongly recommended in production. */
   manifest?: Record<string, string> | Map<string, string> | null;
   fetch?: typeof fetch;
+  /** Authorization credentials/headers for every model and texture request. */
+  requestInit?: PTAssetRequestInit;
   textureCache?: TextureCache;
   /** Parse off the main thread. Falls back automatically if unavailable. */
   useWorker?: boolean;
@@ -702,14 +726,22 @@ export class PTLoader {
   constructor(options?: PTLoaderOptions);
   baseUrl: string;
   manifest: Record<string, string> | Map<string, string> | null;
+  requestInit?: PTAssetRequestInit;
   textures: TextureCache;
   useWorker: boolean;
   readonly updatables: Set<Object3D>;
 
-  static loadManifest(url: string, fetchImpl?: typeof fetch): Promise<Record<string, string>>;
+  static loadManifest(
+    url: string,
+    fetchImpl?: typeof fetch,
+    requestInit?: PTAssetRequestInit,
+  ): Promise<Record<string, string>>;
   setManifest(manifest: Record<string, string> | Map<string, string>): void;
 
-  fetchBuffer(path: string): Promise<ArrayBuffer>;
+  fetchBuffer(
+    path: string,
+    kind?: Exclude<PTAssetKind, 'texture' | 'manifest'>,
+  ): Promise<ArrayBuffer>;
   parsePAT3D(path: string): Promise<PTPat3D>;
   parseSTAGE3D(path: string): Promise<PTStage3D>;
   parseINX(path: string): Promise<PTInx>;
