@@ -259,6 +259,19 @@ production bundler configuration. DevTools can always display and pretty-print
 the JavaScript actually delivered to the browser; minification reduces source
 disclosure but is not a security boundary.
 
+### Publishing releases to npm
+
+`.github/workflows/publish.yml` publishes when a tag such as `v0.1.2` is pushed.
+The tag must match the `version` in `package.json`. It also supports manually
+dispatching the workflow for an existing release tag.
+
+Before the first automated publish, create a granular npm access token with
+package publish permission and the **bypass 2FA** option. Add it to the GitHub
+repository as the `NPM_TOKEN` Actions secret. The workflow passes that secret
+only to the publish command; it is never committed. Legacy npm tokens are not
+accepted for this use case. Trusted Publishing/OIDC can be enabled later as a
+long-lived-token-free alternative once the package exists on npm.
+
 ### C. An animated character
 
 ```js

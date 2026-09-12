@@ -21,7 +21,7 @@ test('published entry points use minified dist files and exclude source', async 
   assert.equal(pkg.exports['.'].import, './dist/index.js');
   assert.equal(pkg.exports['./core'].import, './dist/core.js');
   assert.equal(pkg.exports['./viewer'].import, './dist/viewer.js');
-  assert.equal(pkg.bin['pt-assets'], './dist/cli.js');
+  assert.equal(pkg.bin['pt-assets'], 'dist/cli.js');
   assert.ok(pkg.files.includes('dist'));
   assert.ok(!pkg.files.includes('src'));
   assert.ok(!pkg.files.includes('bin'));

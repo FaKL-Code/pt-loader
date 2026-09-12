@@ -37,7 +37,7 @@
   },
   "types": "./types/index.d.ts",
   "bin": {
-    "pt-assets": "./dist/cli.js"
+    "pt-assets": "dist/cli.js"
   },
   "files": [
     "dist",
