@@ -635,7 +635,8 @@ export const UNIT_SCALE: number;
 // Texture cache
 // ===========================================================================
 
-export type PTAssetKind = 'asset' | 'model' | 'stage' | 'animation' | 'texture' | 'manifest';
+export type PTAssetKind =
+  'asset' | 'model' | 'stage' | 'animation' | 'texture' | 'manifest' | 'preview';
 
 export interface PTAssetRequestContext {
   /** Fully resolved URL that will be passed to `fetch`. */
@@ -783,3 +784,5 @@ export class PTLoader {
 }
 
 export default PTLoader;
+
+export * from './preview.js';

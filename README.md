@@ -26,6 +26,7 @@ scene.add(await loader.loadModel('image/Sinimage/Items/DropItem/it0123.smd'));
 - [Step 1 — prepare the assets](#step-1--prepare-the-assets) ← **do not skip**
 - [Step 2 — use the loader](#step-2--use-the-loader)
 - [Protecting models and textures](#protecting-models-and-textures)
+- [Private server-rendered previews](#private-server-rendered-previews)
 - [Picking surfaces](#f-picking-a-surface-the-texture-picker)
 - [API](#api)
 - [Build options](#build-options)
@@ -249,6 +250,75 @@ const loader = new PTLoader({
 After logout, call `loader.dispose()` and ensure the backend invalidates the
 session/token. CORS and `Referer` checks are useful supporting controls, but are
 not authorization by themselves.
+
+### Private server-rendered previews
+
+If a public product page must show the **original** model with small camera
+interactions while keeping the model and textures out of the browser, the
+normal `PTLoader` browser flow cannot satisfy that requirement: a browser-side
+renderer must receive the bytes it uploads to WebGL. Use the separate preview
+contract instead. The server loads the private asset and returns only rendered
+image frames.
+
+```js
+import { PTPreviewClient } from '@fakl-code/pt-loader/preview';
+
+const preview = new PTPreviewClient({
+  endpoint: '/api/previews',
+  requestInit: { credentials: 'include', cache: 'no-store' },
+});
+
+await preview.open('item_123', { width: 640, height: 480 });
+
+const frame = await preview.render({
+  camera: { azimuth: 0.4, elevation: 0.2, distance: 3.5 },
+});
+image.src = frame.url; // only an image frame reaches the browser
+
+await preview.close();
+```
+
+The `pt-preview-v1` contract is intentionally asset-agnostic:
+
+1. `POST /api/previews/sessions` receives an opaque `assetId`, never a file
+   path. It returns a short-lived `sessionId`.
+2. `POST /api/previews/sessions/:id/render` receives a small JSON camera/state
+   object and must return `image/webp`, `image/jpeg`, `image/avif` or `image/png`.
+   The client rejects other content types and frames above its configured size
+   limit.
+3. `DELETE /api/previews/sessions/:id` closes the session.
+
+The server must authenticate or rate-limit session creation, resolve the opaque
+ID through an allowlist, enforce expiry and ownership, and render with the
+original assets kept outside the public/static root. Do not return manifests,
+model files, texture files, signed asset URLs or arbitrary paths from these
+endpoints. For fluid interaction, the same contract can be backed by a
+WebSocket or WebRTC transport; the HTTP client is the simple reference
+transport.
+
+For a framework-neutral Fetch API handler, use the Node-only entry point:
+
+```js
+import { createPreviewHandler } from '@fakl-code/pt-loader/preview-server';
+
+const handlePreview = createPreviewHandler({
+  authenticate: (request) => request.headers.get('x-user'),
+  resolveAsset: ({ assetId }) => privateAssetStore.lookup(assetId),
+  renderFrame: async ({ asset, state, viewport }) => ({
+    // Load `asset` with PTLoader/three in the private renderer and return pixels.
+    body: await renderPrivateFrame(asset, state, viewport),
+    contentType: 'image/webp',
+  }),
+});
+```
+
+Adapt your web framework's request and response objects to the standard Fetch
+API at the boundary. `resolveAsset` may return any private server-side value;
+the handler only serialises the frame returned by `renderFrame`.
+
+`PTLoader` and `PTViewer` remain unchanged for authorized browser-side loading.
+The preview client is an opt-in, separate entry point for deployments where
+asset confidentiality matters more than local WebGL rendering.
 
 #### Published JavaScript and source maps
 

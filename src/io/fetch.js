@@ -8,7 +8,7 @@
  * @param {typeof fetch} fetchImpl
  * @param {string} url
  * @param {string} path
- * @param {'asset'|'model'|'stage'|'animation'|'texture'|'manifest'} kind
+ * @param {'asset'|'model'|'stage'|'animation'|'texture'|'manifest'|'preview'} kind
  * @param {RequestInit|((context: {url:string, path:string, kind:string}) =>
  *   RequestInit|undefined|Promise<RequestInit|undefined>)|undefined} requestInit
  */

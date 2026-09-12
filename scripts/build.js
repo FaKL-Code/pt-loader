@@ -8,6 +8,8 @@ await build({
     index: 'src/index.js',
     core: 'src/core.js',
     viewer: 'src/viewer.js',
+    preview: 'src/preview.js',
+    'preview-server': 'src/preview-server.js',
     'worker/parse.worker': 'src/worker/parse.worker.js',
     cli: 'bin/cli.js',
   },

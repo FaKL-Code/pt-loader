@@ -6,6 +6,7 @@ import { fetchAsset } from './io/fetch.js';
 import { buildModel, buildStage, buildCollisionMesh } from './build/model.js';
 import { buildClips } from './build/animation.js';
 import { pickAt } from './build/picking.js';
+export { PTPreviewClient, PTPreviewError, PT_PREVIEW_PROTOCOL } from './preview.js';
 import { dirOf, baseOf, changeExt, stripExt, normalize } from './util/paths.js';
 
 export * from './core.js';

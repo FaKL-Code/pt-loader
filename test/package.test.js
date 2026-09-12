@@ -22,6 +22,8 @@ test('published entry points use minified dist files and exclude source', async 
   assert.equal(pkg.exports['.'].import, './dist/index.js');
   assert.equal(pkg.exports['./core'].import, './dist/core.js');
   assert.equal(pkg.exports['./viewer'].import, './dist/viewer.js');
+  assert.equal(pkg.exports['./preview'].import, './dist/preview.js');
+  assert.equal(pkg.exports['./preview-server'].import, './dist/preview-server.js');
   assert.equal(pkg.bin['pt-assets'], 'dist/cli.js');
   assert.ok(pkg.files.includes('dist'));
   assert.ok(!pkg.files.includes('src'));
@@ -46,4 +48,15 @@ test('built core entry point remains importable', async () => {
   const core = await import('../dist/core.js');
   assert.equal(typeof core.parsePAT3D, 'function');
   assert.equal(typeof core.decodeImage, 'function');
+});
+
+test('built private-preview entry point remains importable', async () => {
+  const preview = await import('../dist/preview.js');
+  assert.equal(preview.PT_PREVIEW_PROTOCOL, 'pt-preview-v1');
+  assert.equal(typeof preview.PTPreviewClient, 'function');
+});
+
+test('built preview-server entry point remains importable', async () => {
+  const server = await import('../dist/preview-server.js');
+  assert.equal(typeof server.createPreviewHandler, 'function');
 });

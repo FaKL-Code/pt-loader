@@ -33,6 +33,14 @@
       "types": "./types/viewer.d.ts",
       "import": "./dist/viewer.js"
     },
+    "./preview": {
+      "types": "./types/preview.d.ts",
+      "import": "./dist/preview.js"
+    },
+    "./preview-server": {
+      "types": "./types/preview-server.d.ts",
+      "import": "./dist/preview-server.js"
+    },
     "./package.json": "./package.json"
   },
   "types": "./types/index.d.ts",
@@ -55,7 +63,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test test/build.test.js test/cli.test.js test/core.test.js test/integration.test.js test/package.test.js test/picking.test.js",
+    "test": "npm run build && node --test test/build.test.js test/cli.test.js test/core.test.js test/integration.test.js test/package.test.js test/picking.test.js test/preview.test.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run format:check && npm test && npm pack --dry-run",

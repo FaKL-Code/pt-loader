@@ -6,6 +6,11 @@ the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `PTPreviewClient` and the `pt-preview-v1` contract for server-rendered
+  previews that keep original models and textures off the browser.
+
 ## [0.1.2] - 2026-09-11
 
 ### Changed
