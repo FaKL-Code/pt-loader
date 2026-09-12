@@ -268,22 +268,29 @@ contract instead. The server loads the private asset and returns only rendered
 image frames.
 
 ```js
-import { PTPreviewClient } from '@fakl-code/pt-loader/preview';
+import { PTPreviewClient, PTPreviewViewer } from '@fakl-code/pt-loader/preview';
 
-const preview = new PTPreviewClient({
+const client = new PTPreviewClient({
   endpoint: '/api/previews',
   requestInit: { credentials: 'include', cache: 'no-store' },
 });
 
+const image = document.querySelector('#item-preview');
+const preview = new PTPreviewViewer(image, { client });
 await preview.open('item_123', { width: 640, height: 480 });
 
-const frame = await preview.render({
-  camera: { azimuth: 0.4, elevation: 0.2, distance: 3.5 },
-});
-image.src = frame.url; // only an image frame reaches the browser
+// Drag to orbit, right-drag/Shift+drag to pan and wheel to zoom.
+// Only image frames reach the browser; the viewer coalesces requests while
+// the server is rendering.
 
-await preview.close();
+preview.dispose();
 ```
+
+`PTPreviewViewer` is the reusable interaction layer for this contract. It
+owns pointer capture, disables the browser's native image drag, handles touch
+and wheel input, and ignores stale frames after a session is replaced. Use
+`PTPreviewClient` directly only when the application needs a custom input
+surface or transport.
 
 The `pt-preview-v1` contract is intentionally asset-agnostic:
 
@@ -336,15 +343,16 @@ production bundler configuration. DevTools can always display and pretty-print
 the JavaScript actually delivered to the browser; minification reduces source
 disclosure but is not a security boundary.
 
-### Publishing releases to npm
+### Publishing releases to npm and GitHub
 
 Every push to `main` starts `.github/workflows/publish.yml`. The workflow reads
 the latest published version, increments the patch number in its isolated CI
 workspace, validates the package, and publishes that version to npm. This keeps
 the protected `main` branch unchanged while still creating a new npm version
-for every deploy. Pushes to other branches do not publish. The workflow also
-supports manually dispatching an existing release tag (for example, to retry a
-publish).
+for every deploy. After npm accepts the package, the same job creates a matching
+GitHub Release and tag with generated notes. Pushes to other branches do not
+publish. The workflow also supports manually dispatching an existing release
+tag (for example, to retry a publish).
 
 Before the first automated publish, create a granular npm access token with
 package publish permission and the **bypass 2FA** option. Add it to the GitHub
@@ -352,6 +360,12 @@ repository as the `NPM_TOKEN` Actions secret. The workflow passes that secret
 only to the publish command; it is never committed. Legacy npm tokens are not
 accepted for this use case. Trusted Publishing/OIDC can be enabled later as a
 long-lived-token-free alternative once the package exists on npm.
+
+Every package, public-type, build, CI or release commit must include a
+documentation change. `npm run check` and GitHub CI enforce this rule; see
+[`AGENTS.md`](./AGENTS.md) and [`CHANGELOG.md`](./CHANGELOG.md). Do not publish
+an ad-hoc local build: merge to protected `main` and let the workflow publish
+npm and create the GitHub Release together.
 
 ### C. An animated character
 

@@ -17,6 +17,14 @@ The package is pure ESM and ships its source directly, so there is no compile
 step. Run `npm run check` before opening a pull request; it executes the full
 test suite and validates the npm package contents.
 
+Every commit that changes package code, public types, build scripts, CI or
+release behavior must also update user-facing documentation in the same commit
+(`README.md`, `CHANGELOG.md`, `docs/` or this guide). `npm run check:release` and
+GitHub CI enforce this rule. A merge to protected `main` is the release event:
+the workflow publishes the next patch version to npm and creates the matching
+GitHub Release. See [`AGENTS.md`](./AGENTS.md) for the shared instructions used
+by human and AI contributors.
+
 ## Project structure
 
 ```text
@@ -46,6 +54,7 @@ commit message.
 - Preserve the rendering contracts documented in the README, especially UV
   orientation, non-indexed geometry and material depth/blend behavior.
 - Update the TypeScript declarations when changing a public API.
+- Update `README.md` and `CHANGELOG.md` when changing a public API or behavior.
 - Do not commit proprietary game assets. Tests must use synthetic fixtures or
   assets you have permission to redistribute.
 - Keep changes focused and explain the source-format evidence behind parser

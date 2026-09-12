@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { PTPreviewClient, PT_PREVIEW_PROTOCOL } from '../src/preview.js';
+import { PTPreviewClient, PTPreviewViewer, PT_PREVIEW_PROTOCOL } from '../src/preview.js';
 import { createPreviewHandler } from '../src/preview-server.js';
 
 function jsonResponse(body, status = 200) {
@@ -194,3 +194,71 @@ test('preview server enforces bounded request bodies', async () => {
   assert.equal(response.status, 413);
   assert.deepEqual(await response.json(), { error: 'request_too_large' });
 });
+
+test('preview viewer owns pointer controls and coalesces server frames', async () => {
+  const image = fakeImage();
+  const states = [];
+  const client = {
+    open: async () => ({ sessionId: 's1', expiresAt: null }),
+    render: async (state) => {
+      states.push(state);
+      return { blob: new Blob([1]), url: `blob:frame-${states.length}`, contentType: 'image/webp' };
+    },
+    dispose() {},
+  };
+  const viewer = new PTPreviewViewer(image, { client });
+
+  await viewer.open('item_123');
+  image.dispatch('pointerdown', pointer({ pointerId: 1, clientX: 100, clientY: 100 }));
+  image.dispatch('pointermove', pointer({ pointerId: 1, clientX: 220, clientY: 80 }));
+  image.dispatch('pointerup', pointer({ pointerId: 1, clientX: 220, clientY: 80 }));
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  assert.equal(image.draggable, false);
+  assert.ok(viewer.camera.azimuth > 0.9);
+  assert.ok(states.length >= 2);
+  assert.deepEqual(states.at(-1).camera, viewer.camera);
+  viewer.dispose();
+});
+
+function fakeImage() {
+  const listeners = new Map();
+  let captured = null;
+  return {
+    src: '',
+    draggable: true,
+    style: {},
+    addEventListener(type, callback) {
+      const list = listeners.get(type) ?? [];
+      list.push(callback);
+      listeners.set(type, list);
+    },
+    removeEventListener(type, callback) {
+      listeners.set(
+        type,
+        (listeners.get(type) ?? []).filter((item) => item !== callback),
+      );
+    },
+    dispatch(type, event) {
+      for (const callback of listeners.get(type) ?? []) callback(event);
+    },
+    setPointerCapture(pointerId) {
+      captured = pointerId;
+    },
+    hasPointerCapture(pointerId) {
+      return captured === pointerId;
+    },
+    releasePointerCapture(pointerId) {
+      if (captured === pointerId) captured = null;
+    },
+  };
+}
+
+function pointer(values) {
+  return {
+    pointerType: 'mouse',
+    button: 0,
+    preventDefault() {},
+    ...values,
+  };
+}

@@ -14,7 +14,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: npm-release
@@ -34,6 +34,7 @@ jobs:
       - name: Check out release tag
         uses: actions/checkout@v6
         with:
+          fetch-depth: 0
           ref: >-
             ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' &&
             'main' || github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
@@ -83,6 +84,21 @@ jobs:
         run: test -n "$NODE_AUTH_TOKEN"
 
       - name: Test and publish
-        run: npm publish --access public
+        run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; leaving it unchanged."
+            exit 0
+          fi
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --generate-notes
+          else
+            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "$RELEASE_TAG" --generate-notes
+          fi

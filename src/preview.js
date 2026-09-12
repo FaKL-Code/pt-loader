@@ -242,6 +242,261 @@ export class PTPreviewClient {
   }
 }
 
+const DEFAULT_PREVIEW_CAMERA = Object.freeze({
+  azimuth: 0,
+  elevation: 0.2,
+  distance: 3.5,
+  panX: 0,
+  panY: 0,
+});
+
+/**
+ * Interactive image surface for a {@link PTPreviewClient}.
+ *
+ * This keeps all browser interaction in the package: the consumer supplies an
+ * image element and a preview client, while the original model and textures
+ * remain on the server. Pointer capture, native image dragging and render
+ * coalescing are handled here so slow server frames do not make the controls
+ * intermittent.
+ */
+export class PTPreviewViewer {
+  /**
+   * @param {HTMLElement|string} target image element or selector
+   * @param {object} options
+   * @param {PTPreviewClient} options.client preview client used for frames
+   * @param {Partial<typeof DEFAULT_PREVIEW_CAMERA>} [options.camera]
+   * @param {(camera: Record<string, number>) => Record<string, unknown>} [options.state]
+   * @param {(error: unknown) => void} [options.onError]
+   */
+  constructor(
+    target,
+    {
+      client,
+      camera = {},
+      state = (nextCamera) => ({ camera: { ...nextCamera } }),
+      onError = undefined,
+    } = {},
+  ) {
+    const element = resolvePreviewElement(target);
+    if (!element) throw new TypeError('pt-loader: preview target element is required');
+    if (!client || typeof client.render !== 'function' || typeof client.open !== 'function') {
+      throw new TypeError('pt-loader: preview viewer requires a PTPreviewClient');
+    }
+    if (typeof state !== 'function')
+      throw new TypeError('pt-loader: preview state must be a function');
+
+    this.element = element;
+    this.client = client;
+    this.camera = { ...DEFAULT_PREVIEW_CAMERA, ...camera };
+    this.state = state;
+    this.onError = onError;
+    this._disposed = false;
+    this._generation = 0;
+    this._queued = false;
+    this._drainPromise = null;
+    this._drainResolve = null;
+    this._drainReject = null;
+    this._ownedUrl = null;
+    this._bindControls();
+  }
+
+  /** Open a server session and render its first frame. */
+  async open(assetId, options = {}) {
+    this.#assertActive();
+    const generation = ++this._generation;
+    await this.client.open(assetId, options);
+    if (generation !== this._generation || this._disposed) return null;
+    return this.requestRender();
+  }
+
+  /** Update camera values and request the newest frame. */
+  setCamera(values, { render = true } = {}) {
+    this.#assertActive();
+    if (values === null || typeof values !== 'object' || Array.isArray(values)) {
+      throw new TypeError('pt-loader: preview camera must be an object');
+    }
+    Object.assign(this.camera, values);
+    return render ? this.requestRender() : Promise.resolve(null);
+  }
+
+  /** Restore the default orbit camera. */
+  resetCamera({ render = true } = {}) {
+    return this.setCamera(DEFAULT_PREVIEW_CAMERA, { render });
+  }
+
+  /** Render immediately, without changing the camera. */
+  async render({ signal } = {}) {
+    this.#assertActive();
+    const generation = this._generation;
+    const frame = await this.client.render(this.state({ ...this.camera }), { signal });
+    if (generation !== this._generation || this._disposed) return frame;
+    this.#setFrame(frame);
+    return frame;
+  }
+
+  /**
+   * Queue a frame. Multiple pointer events collapse into one latest-state
+   * request while a server render is in flight.
+   */
+  requestRender() {
+    this.#assertActive();
+    this._queued = true;
+    if (!this._drainPromise) {
+      this._drainPromise = new Promise((resolve, reject) => {
+        this._drainResolve = resolve;
+        this._drainReject = reject;
+      });
+      scheduleFrame(() => void this.#drain());
+    }
+    return this._drainPromise;
+  }
+
+  /** Remove event listeners, release the image URL and close local state. */
+  dispose() {
+    if (this._disposed) return;
+    this._disposed = true;
+    this._generation += 1;
+    this._queued = false;
+    this._unbindControls?.();
+    if (this._ownedUrl && typeof URL.revokeObjectURL === 'function')
+      URL.revokeObjectURL(this._ownedUrl);
+    this._ownedUrl = null;
+    this.client.dispose?.();
+    const reject = this._drainReject;
+    this._drainPromise = null;
+    this._drainResolve = null;
+    this._drainReject = null;
+    reject?.(new PTPreviewError('pt-loader: preview viewer disposed', { code: 'disposed' }));
+  }
+
+  #assertActive() {
+    if (this._disposed)
+      throw new PTPreviewError('pt-loader: preview viewer is disposed', { code: 'disposed' });
+  }
+
+  async #drain() {
+    let lastFrame = null;
+    try {
+      while (this._queued && !this._disposed) {
+        this._queued = false;
+        lastFrame = await this.render();
+        if (this._queued) await nextFrame();
+      }
+      this._drainResolve?.(lastFrame);
+    } catch (error) {
+      this.onError?.(error);
+      this._drainReject?.(error);
+    } finally {
+      this._drainPromise = null;
+      this._drainResolve = null;
+      this._drainReject = null;
+      if (this._queued && !this._disposed) this.requestRender();
+    }
+  }
+
+  #setFrame(frame) {
+    if (!frame || typeof frame !== 'object')
+      throw new PTPreviewError('pt-loader: preview frame is invalid');
+    if (this._ownedUrl && typeof URL.revokeObjectURL === 'function') {
+      URL.revokeObjectURL(this._ownedUrl);
+      this._ownedUrl = null;
+    }
+    let url = frame.url;
+    if (frame.blob && typeof URL.createObjectURL === 'function') {
+      url = URL.createObjectURL(frame.blob);
+      this._ownedUrl = url;
+    }
+    if (typeof url === 'string') this.element.src = url;
+  }
+
+  _bindControls() {
+    const image = this.element;
+    image.draggable = false;
+    image.style.touchAction = 'none';
+    image.style.userSelect = 'none';
+    image.style.webkitUserDrag = 'none';
+
+    const interaction = { pointerId: null, startX: 0, startY: 0, initial: null, pan: false };
+    const stop = (event) => {
+      if (interaction.pointerId !== event.pointerId) return;
+      if (image.hasPointerCapture?.(event.pointerId)) image.releasePointerCapture(event.pointerId);
+      interaction.pointerId = null;
+      interaction.initial = null;
+    };
+    const onDown = (event) => {
+      if (event.pointerType === 'mouse' && ![0, 1, 2].includes(event.button)) return;
+      event.preventDefault();
+      interaction.pointerId = event.pointerId;
+      interaction.startX = event.clientX;
+      interaction.startY = event.clientY;
+      interaction.initial = { ...this.camera };
+      interaction.pan = event.button === 1 || event.button === 2 || event.shiftKey;
+      image.setPointerCapture?.(event.pointerId);
+    };
+    const onMove = (event) => {
+      if (interaction.pointerId !== event.pointerId || !interaction.initial) return;
+      event.preventDefault();
+      const dx = event.clientX - interaction.startX;
+      const dy = event.clientY - interaction.startY;
+      if (interaction.pan) {
+        this.camera.panX = interaction.initial.panX + dx / 380;
+        this.camera.panY = interaction.initial.panY - dy / 380;
+      } else {
+        this.camera.azimuth = interaction.initial.azimuth + dx / 120;
+        this.camera.elevation = Math.max(
+          -1.1,
+          Math.min(1.1, interaction.initial.elevation - dy / 160),
+        );
+      }
+      void this.requestRender().catch(() => {});
+    };
+    const onWheel = (event) => {
+      event.preventDefault();
+      this.camera.distance = Math.max(
+        1.8,
+        Math.min(8, this.camera.distance * Math.exp(event.deltaY * 0.001)),
+      );
+      void this.requestRender().catch(() => {});
+    };
+    const onContextMenu = (event) => event.preventDefault();
+    const onDragStart = (event) => event.preventDefault();
+
+    image.addEventListener('pointerdown', onDown, { passive: false });
+    image.addEventListener('pointermove', onMove, { passive: false });
+    image.addEventListener('pointerup', stop);
+    image.addEventListener('pointercancel', stop);
+    image.addEventListener('lostpointercapture', stop);
+    image.addEventListener('wheel', onWheel, { passive: false });
+    image.addEventListener('contextmenu', onContextMenu);
+    image.addEventListener('dragstart', onDragStart);
+    this._unbindControls = () => {
+      image.removeEventListener('pointerdown', onDown);
+      image.removeEventListener('pointermove', onMove);
+      image.removeEventListener('pointerup', stop);
+      image.removeEventListener('pointercancel', stop);
+      image.removeEventListener('lostpointercapture', stop);
+      image.removeEventListener('wheel', onWheel);
+      image.removeEventListener('contextmenu', onContextMenu);
+      image.removeEventListener('dragstart', onDragStart);
+    };
+  }
+}
+
+function resolvePreviewElement(target) {
+  if (typeof target === 'string') return globalThis.document?.querySelector(target) ?? null;
+  return target && typeof target.addEventListener === 'function' ? target : null;
+}
+
+function scheduleFrame(callback) {
+  if (typeof globalThis.requestAnimationFrame === 'function')
+    globalThis.requestAnimationFrame(callback);
+  else globalThis.setTimeout(callback, 0);
+}
+
+function nextFrame() {
+  return new Promise((resolve) => scheduleFrame(resolve));
+}
+
 function assertKind(kind) {
   if (kind !== 'model' && kind !== 'character' && kind !== 'stage') {
     throw new TypeError(`pt-loader: unsupported preview kind "${kind}"`);

@@ -35,6 +35,21 @@ export interface PTPreviewOpenOptions {
   signal?: AbortSignal;
 }
 
+export interface PTPreviewCamera {
+  azimuth: number;
+  elevation: number;
+  distance: number;
+  panX: number;
+  panY: number;
+}
+
+export interface PTPreviewViewerOptions {
+  client: PTPreviewClient;
+  camera?: Partial<PTPreviewCamera>;
+  state?: (camera: PTPreviewCamera) => Record<string, unknown>;
+  onError?: (error: unknown) => void;
+}
+
 export class PTPreviewError extends Error {
   readonly name: 'PTPreviewError';
   readonly code: string;
@@ -60,5 +75,25 @@ export class PTPreviewClient {
   ): Promise<PTPreviewFrame>;
   close(options?: { signal?: AbortSignal }): Promise<void>;
   /** Release the local object URL without making a network request. */
+  dispose(): void;
+}
+
+/**
+ * Pointer-controlled image viewer for server-rendered frames. The browser
+ * receives only image frames; model and texture bytes remain server-side.
+ */
+export class PTPreviewViewer {
+  constructor(target: HTMLElement | string, options: PTPreviewViewerOptions);
+  readonly element: HTMLElement;
+  readonly client: PTPreviewClient;
+  readonly camera: PTPreviewCamera;
+  open(assetId: string, options?: PTPreviewOpenOptions): Promise<PTPreviewFrame | null>;
+  setCamera(
+    values: Partial<PTPreviewCamera>,
+    options?: { render?: boolean },
+  ): Promise<PTPreviewFrame | null>;
+  resetCamera(options?: { render?: boolean }): Promise<PTPreviewFrame | null>;
+  render(options?: { signal?: AbortSignal }): Promise<PTPreviewFrame>;
+  requestRender(): Promise<PTPreviewFrame | null>;
   dispose(): void;
 }

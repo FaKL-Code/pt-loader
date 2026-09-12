@@ -8,16 +8,18 @@ the project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- `PTPreviewClient` and the `pt-preview-v1` contract for server-rendered
-  previews that keep original models and textures off the browser.
+- `PTPreviewViewer`, a reusable interaction layer for private, server-rendered
+  previews. It owns pointer capture, native image-drag prevention,
+  orbit/pan/zoom controls, stale-session protection and frame coalescing.
 
 ### Changed
 
-- Pushes to `main` now create patch releases and publish automatically to npm.
-- Added safe relative-path checks, bounded asset/manifest responses, bounded
-  decoded texture pixels, and a memory-bounded input buffer cache.
-- Preview request bodies and binary parser payloads are now bounded before large
-  allocations.
+- The example integration now consumes the package preview abstraction instead
+  of duplicating browser interaction code.
+- Pushes to `main` now create a matching GitHub Release after publishing the
+  patch version to npm.
+- Added a release-discipline check requiring documentation changes alongside
+  package, type, build or CI changes.
 
 ## [0.1.2] - 2026-09-11
 
