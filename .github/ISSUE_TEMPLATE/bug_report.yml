@@ -1,0 +1,77 @@
+name: Bug report
+description: Report a reproducible defect in the loader, viewer, or CLI
+title: '[Bug]: '
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve pt-loader. Do not upload proprietary game assets. Use a minimal synthetic fixture or describe how maintainers can reproduce the problem legally.
+
+  - type: input
+    id: version
+    attributes:
+      label: Package version or commit
+      placeholder: v0.1.0 or a commit SHA
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - SMD / SMB parser
+        - INX parser
+        - BMP / TGA decoder
+        - three.js build layer
+        - PTViewer / picking
+        - pt-assets CLI
+        - TypeScript declarations
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime
+      description: Include Node.js, browser, three.js, operating system, and bundler versions where relevant.
+      placeholder: Node 22, three.js r180, Vite 7, Chrome 140, Windows 11
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the actual and expected behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide a small code sample, public repository, or precise steps.
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Include the complete error and, for asset parsing, the relevant `pt-assets inspect` output. Remove sensitive paths or data.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched for an existing issue describing this problem.
+          required: true
+        - label: I can share the reproduction without violating asset licenses or other rights.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

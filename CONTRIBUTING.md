@@ -33,6 +33,12 @@ test/            synthetic fixtures and integration tests
 
 ## Pull requests
 
+Create a focused branch in your fork and open a pull request against `main`.
+Direct pushes to `main` are reserved for maintainer recovery; community changes
+must pass CI and receive an approving review from the code owner. The repository
+uses squash merges, so write a clear pull-request title that can become the final
+commit message.
+
 - Keep `src/formats/` free of three.js imports so parsers remain usable in
   workers and Node.js.
 - Add or update a synthetic fixture for binary-layout changes and assert final
@@ -47,4 +53,5 @@ test/            synthetic fixtures and integration tests
 
 Bug reports should include the loader version, runtime, relevant console error
 and the output of `pt-assets inspect`. Do not attach copyrighted game assets to
-public issues.
+public issues. See [GOVERNANCE.md](./GOVERNANCE.md) for the review and decision
+process, and [SUPPORT.md](./SUPPORT.md) for the right support channel.

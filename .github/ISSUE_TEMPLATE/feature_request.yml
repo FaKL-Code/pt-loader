@@ -1,0 +1,42 @@
+name: Feature request
+description: Propose an improvement to the public API, formats, viewer, or CLI
+title: '[Feature]: '
+labels: [enhancement, triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What use case is difficult or impossible today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the API or behavior you would like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or designs have you already considered?
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Format evidence
+      description: For parser changes, document offsets, versions, or reference behavior without attaching proprietary assets.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched for an existing request covering this idea.
+          required: true
+        - label: This proposal does not require committing proprietary game assets.
+          required: true
