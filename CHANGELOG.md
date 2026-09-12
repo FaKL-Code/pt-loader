@@ -18,6 +18,8 @@ the project follows [Semantic Versioning](https://semver.org/).
   of duplicating browser interaction code.
 - Pushes to `main` now create a matching GitHub Release after publishing the
   patch version to npm.
+- npm publishing uses trusted provenance attestations through the workflow's
+  `id-token` permission.
 - Added a release-discipline check requiring documentation changes alongside
   package, type, build or CI changes.
 
