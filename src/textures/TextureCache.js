@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { decodeImage, NATIVE_EXTENSIONS } from './decode.js';
 import { resolveAssetPath, baseOf } from '../util/paths.js';
-import { fetchAsset } from '../io/fetch.js';
+import { fetchAsset, readResponseBytes } from '../io/fetch.js';
 
 /**
  * Loads, decrypts, decodes and caches Priston Tale textures.
@@ -24,6 +24,8 @@ export class TextureCache {
    *   evaluated per request when supplied as a callback
    * @param {number} [opts.anisotropy=4]
    * @param {number} [opts.maxSize=4096] downscale above this; 0 disables
+   * @param {number} [opts.maxTextureBytes=33554432] maximum downloaded texture size
+   * @param {number} [opts.maxTexturePixels=16777216] maximum decoded pixel count
    * @param {boolean} [opts.warnMissing=true]
    */
   constructor({
@@ -33,6 +35,8 @@ export class TextureCache {
     requestInit = undefined,
     anisotropy = 4,
     maxSize = 4096,
+    maxTextureBytes = 32 * 1024 * 1024,
+    maxTexturePixels = 16 * 1024 * 1024,
     warnMissing = true,
   } = {}) {
     this.baseUrl = baseUrl;
@@ -41,6 +45,10 @@ export class TextureCache {
     this.requestInit = requestInit;
     this.anisotropy = anisotropy;
     this.maxSize = maxSize;
+    assertPositiveLimit(maxTextureBytes, 'maxTextureBytes');
+    assertPositiveLimit(maxTexturePixels, 'maxTexturePixels');
+    this.maxTextureBytes = maxTextureBytes;
+    this.maxTexturePixels = maxTexturePixels;
     this.warnMissing = warnMissing;
 
     /** @type {Map<string, Promise<THREE.Texture>>} */
@@ -115,7 +123,7 @@ export class TextureCache {
     const url = this.baseUrl + resolved;
     const res = await fetchAsset(this.fetch, url, resolved, 'texture', this.requestInit);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const buffer = await res.arrayBuffer();
+    const buffer = await readResponseBytes(res, this.maxTextureBytes, 'texture');
 
     const ext = baseOf(resolved).toLowerCase().split('.').pop();
     const texture = NATIVE_EXTENSIONS.has(ext)
@@ -136,7 +144,9 @@ export class TextureCache {
 
   /** BMP / TGA: decrypted and decoded in JS, already bottom-up. */
   #fromRaw(buffer, path) {
-    let { width, height, data, hasAlpha } = decodeImage(buffer, path);
+    let { width, height, data, hasAlpha } = decodeImage(buffer, path, {
+      maxPixels: this.maxTexturePixels,
+    });
     if (this.maxSize > 0 && (width > this.maxSize || height > this.maxSize)) {
       ({ width, height, data } = downscaleRGBA(data, width, height, this.maxSize));
     }
@@ -224,6 +234,12 @@ export class TextureCache {
     this.cache.clear();
     this._missing?.dispose();
     this._missing = null;
+  }
+}
+
+function assertPositiveLimit(value, name) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new RangeError(`pt-loader: ${name} must be a positive integer`);
   }
 }
 

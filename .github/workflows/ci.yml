@@ -45,3 +45,7 @@ jobs:
       - name: Inspect package contents
         if: matrix.node == 22
         run: npm pack --dry-run
+
+      - name: Audit production dependencies
+        if: matrix.node == 22
+        run: npm audit --omit=dev --audit-level=high

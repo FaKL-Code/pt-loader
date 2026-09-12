@@ -49,7 +49,13 @@ export class BinaryReader {
   }
 
   #bounds(at, size) {
-    if (at < 0 || at + size > this.u8.byteLength) {
+    if (
+      !Number.isSafeInteger(at) ||
+      !Number.isSafeInteger(size) ||
+      size < 0 ||
+      at < 0 ||
+      at + size > this.u8.byteLength
+    ) {
       throw new RangeError(
         `BinaryReader: read of ${size} byte(s) at offset ${at} exceeds buffer of ${this.u8.byteLength} bytes`,
       );
@@ -130,6 +136,7 @@ export class BinaryReader {
 
   /** Read `n` signed 32-bit integers. */
   i32Array(n) {
+    assertArrayLength(n);
     const out = new Int32Array(n);
     for (let i = 0; i < n; i++) out[i] = this.i32();
     return out;
@@ -137,6 +144,7 @@ export class BinaryReader {
 
   /** Read `n` 32-bit floats. */
   f32Array(n) {
+    assertArrayLength(n);
     const out = new Float32Array(n);
     for (let i = 0; i < n; i++) out[i] = this.f32();
     return out;
@@ -189,6 +197,12 @@ export class BinaryReader {
   }
 }
 
+function assertArrayLength(n) {
+  if (!Number.isSafeInteger(n) || n < 0) {
+    throw new RangeError(`BinaryReader: invalid array length ${n}`);
+  }
+}
+
 /**
  * Guard against absurd array sizes from a misaligned stream before allocating.
  * @param {Record<string, number>} counts
@@ -202,5 +216,15 @@ export function assertSaneCounts(counts, max = 1_000_000) {
           `The stream is misaligned or the file is corrupt.`,
       );
     }
+  }
+}
+
+/** Reject count combinations that cannot fit in the remaining byte stream. */
+export function assertRemaining(reader, bytes, what = 'payload') {
+  if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > reader.remaining) {
+    throw new RangeError(
+      `pt-loader: ${what} needs ${bytes} byte(s), but only ${reader.remaining} remain ` +
+        `(exceeds buffer or the stream is misaligned)`,
+    );
   }
 }

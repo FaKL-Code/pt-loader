@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { PT_PREVIEW_PROTOCOL } from './preview.js';
+import { readResponseBytes } from './io/fetch.js';
 
 const MAX_ID_LENGTH = 128;
 const MAX_STATE_BYTES = 64 * 1024;
@@ -241,9 +242,12 @@ function plainObject(value) {
 }
 
 async function readJson(request, maxBytes) {
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > maxBytes) {
-    throw new PreviewRequestError('request_too_large', 413);
+  let text;
+  try {
+    text = new TextDecoder().decode(await readResponseBytes(request, maxBytes, 'preview request'));
+  } catch (err) {
+    if (err instanceof RangeError) throw new PreviewRequestError('request_too_large', 413);
+    throw err;
   }
   try {
     return JSON.parse(text);

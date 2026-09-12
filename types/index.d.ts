@@ -286,9 +286,13 @@ export function parseSMB(buffer: ArrayBuffer | Uint8Array): PTPat3D;
 export function parseSTAGE3D(buffer: ArrayBuffer | Uint8Array): PTStage3D;
 export function parseINX(buffer: ArrayBuffer | Uint8Array): PTInx;
 
-export function decodeBMP(u8: Uint8Array): PTDecodedImage;
-export function decodeTGA(u8: Uint8Array): PTDecodedImage;
-export function decodeImage(buffer: ArrayBuffer | Uint8Array, filename?: string): PTDecodedImage;
+export function decodeBMP(u8: Uint8Array, options?: { maxPixels?: number }): PTDecodedImage;
+export function decodeTGA(u8: Uint8Array, options?: { maxPixels?: number }): PTDecodedImage;
+export function decodeImage(
+  buffer: ArrayBuffer | Uint8Array,
+  filename?: string,
+  options?: { maxPixels?: number },
+): PTDecodedImage;
 
 export function decryptBMP(u8: Uint8Array): Uint8Array;
 export function decryptTGA(u8: Uint8Array): Uint8Array;
@@ -321,6 +325,8 @@ export class BinaryReader {
   /** Throws if the cursor is not exactly at `expected`. */
   expect(expected: number, what: string): this;
 }
+export function assertSaneCounts(counts: Record<string, number>, max?: number): void;
+export function assertRemaining(reader: BinaryReader, bytes: number, what?: string): void;
 
 // --------------------------------------------------------------- constants ---
 
@@ -369,6 +375,8 @@ export function dirOf(path: string): string;
 export function baseOf(path: string): string;
 export function stripExt(path: string): string;
 export function changeExt(path: string, ext: string): string;
+export function isSafeAssetPath(path: string): boolean;
+export function assertSafeAssetPath(path: string, label?: string): string;
 export function resolveAssetPath(
   folder: string,
   name: string,
@@ -664,6 +672,10 @@ export interface TextureCacheOptions {
   anisotropy?: number;
   /** Downscale textures above this size. `0` disables. Default `4096`. */
   maxSize?: number;
+  /** Reject downloads larger than this before decoding. Default `32 MiB`. */
+  maxTextureBytes?: number;
+  /** Reject images with more decoded pixels than this. Default `16 MP`. */
+  maxTexturePixels?: number;
   warnMissing?: boolean;
 }
 
@@ -705,6 +717,12 @@ export interface PTLoaderOptions {
   textureCache?: TextureCache;
   /** Parse off the main thread. Falls back automatically if unavailable. */
   useWorker?: boolean;
+  /** Reject model/map/animation responses larger than this. Default `64 MiB`. */
+  maxAssetBytes?: number;
+  /** Reject manifests larger than this. Default `4 MiB`. */
+  maxManifestBytes?: number;
+  /** Bound retained input-buffer memory. Default `64 MiB`. */
+  maxBufferCacheBytes?: number;
   options?: PTBuildOptions & TextureCacheOptions;
 }
 
@@ -736,7 +754,9 @@ export class PTLoader {
     url: string,
     fetchImpl?: typeof fetch,
     requestInit?: PTAssetRequestInit,
+    options?: { maxBytes?: number },
   ): Promise<Record<string, string>>;
+  loadManifest(url: string): Promise<Record<string, string>>;
   setManifest(manifest: Record<string, string> | Map<string, string>): void;
 
   fetchBuffer(

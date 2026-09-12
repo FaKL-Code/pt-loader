@@ -1,4 +1,4 @@
-import { BinaryReader, assertSaneCounts } from '../io/BinaryReader.js';
+import { BinaryReader, assertSaneCounts, assertRemaining } from '../io/BinaryReader.js';
 import { SIZES, FIXED } from './constants.js';
 import { readSmdFileHeader } from './smdHeader.js';
 import { readMaterialGroup, readTexLink } from './material.js';
@@ -138,6 +138,15 @@ export function parseSTAGE3D(buffer) {
 
   let materialGroup = null;
   if (header.matCounter > 0) materialGroup = readMaterialGroup(r);
+
+  assertRemaining(
+    r,
+    nVertex * SIZES.STAGE_VERTEX +
+      nFace * SIZES.STAGE_FACE +
+      nTexLink * SIZES.TEXLINK +
+      nLight * SIZES.LIGHT3D,
+    'STAGE3D payload',
+  );
 
   const vertices = [];
   for (let i = 0; i < nVertex; i++) vertices.push(readStageVertex(r));

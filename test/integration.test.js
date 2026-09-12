@@ -227,3 +227,26 @@ test('an authorization failure is evicted so loading can retry after login', asy
 
   loader.dispose();
 });
+
+test('asset response limits reject oversized files before parsing', async () => {
+  const loader = new PTLoader({
+    baseUrl: '/pt-assets/',
+    fetch: async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-length': '100' }),
+      arrayBuffer: async () => new ArrayBuffer(100),
+    }),
+    maxAssetBytes: 10,
+  });
+
+  await assert.rejects(loader.fetchBuffer('items/large.smd', 'model'), /byte limit/);
+  loader.dispose();
+});
+
+test('manifests reject unsafe target paths', () => {
+  assert.throws(
+    () => new PTLoader({ manifest: { 'item.smd': '../private/item.smd' } }),
+    /unsafe asset path/,
+  );
+});

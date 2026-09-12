@@ -2,12 +2,20 @@ import * as THREE from 'three';
 
 import { parsePAT3D, parseSTAGE3D, parseINX } from './core.js';
 import { TextureCache } from './textures/TextureCache.js';
-import { fetchAsset } from './io/fetch.js';
+import { fetchAsset, readResponseBytes, readResponseText } from './io/fetch.js';
 import { buildModel, buildStage, buildCollisionMesh } from './build/model.js';
 import { buildClips } from './build/animation.js';
 import { pickAt } from './build/picking.js';
 export { PTPreviewClient, PTPreviewError, PT_PREVIEW_PROTOCOL } from './preview.js';
-import { dirOf, baseOf, changeExt, stripExt, normalize } from './util/paths.js';
+import {
+  dirOf,
+  baseOf,
+  changeExt,
+  stripExt,
+  normalize,
+  assertSafeAssetPath,
+  isSafeAssetPath,
+} from './util/paths.js';
 
 export * from './core.js';
 export { TextureCache, downscaleRGBA } from './textures/TextureCache.js';
@@ -71,6 +79,9 @@ export class PTLoader {
    *   fetch options; use this for credentials and authorization headers
    * @param {TextureCache} [opts.textureCache] bring your own cache
    * @param {boolean} [opts.useWorker=false] parse off the main thread
+   * @param {number} [opts.maxAssetBytes=67108864] maximum model/map/animation response size
+   * @param {number} [opts.maxManifestBytes=4194304] maximum manifest response size
+   * @param {number} [opts.maxBufferCacheBytes=67108864] memory retained by parsed input buffers
    * @param {object} [opts.options] defaults for every build; see `buildModel`
    */
   constructor({
@@ -80,16 +91,32 @@ export class PTLoader {
     requestInit = undefined,
     textureCache = null,
     useWorker = false,
+    maxAssetBytes = 64 * 1024 * 1024,
+    maxManifestBytes = 4 * 1024 * 1024,
+    maxBufferCacheBytes = 64 * 1024 * 1024,
     options = {},
   } = {}) {
     this.baseUrl = baseUrl;
+    validateManifest(manifest);
     this.manifest = manifest;
     this.fetch = fetchImpl ?? ((...a) => globalThis.fetch(...a));
     this.requestInit = requestInit;
     this.options = options;
+    assertPositiveLimit(maxAssetBytes, 'maxAssetBytes');
+    assertPositiveLimit(maxManifestBytes, 'maxManifestBytes');
+    assertPositiveLimit(maxBufferCacheBytes, 'maxBufferCacheBytes');
+    this.maxAssetBytes = maxAssetBytes;
+    this.maxManifestBytes = maxManifestBytes;
+    this.maxBufferCacheBytes = maxBufferCacheBytes;
     this.textures =
       textureCache ??
-      new TextureCache({ ...options, baseUrl, manifest, fetch: this.fetch, requestInit });
+      new TextureCache({
+        ...options,
+        baseUrl,
+        manifest,
+        fetch: this.fetch,
+        requestInit,
+      });
     if (textureCache && requestInit !== undefined) textureCache.requestInit = requestInit;
 
     this.useWorker = useWorker;
@@ -99,19 +126,40 @@ export class PTLoader {
 
     /** Roots whose animated materials `update()` drives. @type {Set<THREE.Object3D>} */
     this.updatables = new Set();
-    /** @type {Map<string, Promise<ArrayBuffer>>} */
+    /** @type {Map<string, {promise: Promise<ArrayBuffer>, bytes: number}>} */
     this._buffers = new Map();
+    this._bufferBytes = 0;
   }
 
   /** Fetch and cache a manifest produced by `pt-assets manifest`. */
-  static async loadManifest(url, fetchImpl = globalThis.fetch, requestInit = undefined) {
+  static async loadManifest(
+    url,
+    fetchImpl = globalThis.fetch,
+    requestInit = undefined,
+    { maxBytes = 4 * 1024 * 1024 } = {},
+  ) {
     const res = await fetchAsset(fetchImpl, url, url, 'manifest', requestInit);
     if (!res.ok) throw new Error(`pt-loader: manifest ${url} -> HTTP ${res.status}`);
-    return res.json();
+    try {
+      return JSON.parse(await readResponseText(res, maxBytes, 'manifest'));
+    } catch (err) {
+      if (err instanceof RangeError) throw err;
+      throw new Error(`pt-loader: manifest ${url} is not valid JSON`);
+    }
+  }
+
+  /** Fetch, install and return a manifest using this loader's auth and limits. */
+  async loadManifest(url) {
+    const manifest = await PTLoader.loadManifest(url, this.fetch, this.requestInit, {
+      maxBytes: this.maxManifestBytes,
+    });
+    this.setManifest(manifest);
+    return manifest;
   }
 
   /** Swap the manifest at runtime (e.g. after switching texture packs). */
   setManifest(manifest) {
+    validateManifest(manifest);
     this.manifest = manifest;
     this.textures.manifest = manifest;
   }
@@ -124,23 +172,36 @@ export class PTLoader {
    * @param {'asset'|'model'|'stage'|'animation'} [kind='asset'] request kind
    */
   fetchBuffer(path, kind = 'asset') {
-    const p = normalize(path);
-    let hit = this._buffers.get(p);
-    if (hit) return hit;
+    const p = assertSafeAssetPath(normalize(path));
+    const hit = this._buffers.get(p);
+    if (hit) {
+      this._buffers.delete(p);
+      this._buffers.set(p, hit);
+      return hit.promise;
+    }
 
     const job = (async () => {
       const real = this.#resolve(p);
       const res = await fetchAsset(this.fetch, this.baseUrl + real, real, kind, this.requestInit);
       if (!res.ok) throw new Error(`pt-loader: ${real} -> HTTP ${res.status}`);
-      return res.arrayBuffer();
+      return readResponseBytes(res, this.maxAssetBytes, kind);
     })();
 
-    this._buffers.set(p, job);
+    const entry = { promise: job, bytes: 0 };
+    this._buffers.set(p, entry);
     job.catch(() => {
       // A 401/403 may become valid after login or token refresh. Do not poison
       // the cache permanently with a rejected authorization request.
-      if (this._buffers.get(p) === job) this._buffers.delete(p);
+      if (this._buffers.get(p) === entry) this._buffers.delete(p);
     });
+    job
+      .then((buffer) => {
+        if (this._buffers.get(p) !== entry) return;
+        entry.bytes = buffer.byteLength;
+        this._bufferBytes += entry.bytes;
+        this.#trimBufferCache();
+      })
+      .catch(() => {});
     return job;
   }
 
@@ -148,7 +209,16 @@ export class PTLoader {
     if (!this.manifest) return path;
     const get =
       this.manifest instanceof Map ? (k) => this.manifest.get(k) : (k) => this.manifest[k];
-    return get(path.toLowerCase()) ?? path;
+    return assertSafeAssetPath(get(path.toLowerCase()) ?? path, 'manifest asset path');
+  }
+
+  #trimBufferCache() {
+    for (const [path, entry] of this._buffers) {
+      if (this._bufferBytes <= this.maxBufferCacheBytes) break;
+      if (entry.bytes === 0) continue;
+      this._buffers.delete(path);
+      this._bufferBytes -= entry.bytes;
+    }
   }
 
   // -------------------------------------------------------------- parsing ---
@@ -429,9 +499,30 @@ export class PTLoader {
     this.updatables.clear();
     this.textures.dispose();
     this._buffers.clear();
+    this._bufferBytes = 0;
+    for (const job of this._jobs.values()) job.reject(new Error('pt-loader: loader disposed'));
+    this._jobs.clear();
     this._worker?.terminate();
     this._worker = null;
-    this._jobs.clear();
+  }
+}
+
+function assertPositiveLimit(value, name) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new RangeError(`pt-loader: ${name} must be a positive integer`);
+  }
+}
+
+function validateManifest(manifest) {
+  if (manifest === null || manifest === undefined) return;
+  const entries = manifest instanceof Map ? manifest.values() : Object.values(manifest);
+  if (!(manifest instanceof Map) && (typeof manifest !== 'object' || Array.isArray(manifest))) {
+    throw new TypeError('pt-loader: manifest must be an object, Map or null');
+  }
+  for (const value of entries) {
+    if (typeof value !== 'string' || !isSafeAssetPath(value)) {
+      throw new TypeError('pt-loader: manifest contains an unsafe asset path');
+    }
   }
 }
 

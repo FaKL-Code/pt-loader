@@ -169,3 +169,28 @@ test('preview server binds sessions to a principal and never returns private ass
   );
   assert.equal(otherUser.status, 404);
 });
+
+test('preview server enforces bounded request bodies', async () => {
+  const handler = createPreviewHandler({
+    maxSessions: 1,
+    authenticate: () => 'buyer-1',
+    resolveAsset: () => ({ private: true }),
+    renderFrame: () => ({ body: new Uint8Array([1]), contentType: 'image/webp' }),
+  });
+
+  const response = await handler(
+    new Request('https://example.test/api/previews/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        protocol: PT_PREVIEW_PROTOCOL,
+        assetId: 'item_123',
+        kind: 'model',
+        viewport: { width: 320, height: 240, pixelRatio: 1 },
+        options: { padding: 'x'.repeat(70_000) },
+      }),
+    }),
+  );
+  assert.equal(response.status, 413);
+  assert.deepEqual(await response.json(), { error: 'request_too_large' });
+});

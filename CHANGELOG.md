@@ -14,6 +14,10 @@ the project follows [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Pushes to `main` now create patch releases and publish automatically to npm.
+- Added safe relative-path checks, bounded asset/manifest responses, bounded
+  decoded texture pixels, and a memory-bounded input buffer cache.
+- Preview request bodies and binary parser payloads are now bounded before large
+  allocations.
 
 ## [0.1.2] - 2026-09-11
 

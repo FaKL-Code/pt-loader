@@ -5,6 +5,38 @@ export function normalize(path) {
     .replace(/\/{2,}/g, '/');
 }
 
+/**
+ * Return whether a path is safe to append to an asset base URL.
+ *
+ * Asset references are logical relative paths, never URLs or filesystem paths.
+ * Keeping this check in the package prevents a caller-controlled `../` or
+ * `https://...` value from escaping the configured asset endpoint.
+ */
+export function isSafeAssetPath(path) {
+  if (typeof path !== 'string' || path.length === 0 || /[\u0000-\u001f\u007f?#]/.test(path)) {
+    return false;
+  }
+  const p = normalize(path);
+  if (
+    p.startsWith('/') ||
+    /^[A-Za-z]:\//.test(p) ||
+    /^[A-Za-z][A-Za-z\d+.-]*:/.test(p) ||
+    p.split('/').some((part) => part === '.' || part === '..')
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/** Validate and return a normalised relative asset path. */
+export function assertSafeAssetPath(path, label = 'asset path') {
+  const p = normalize(path);
+  if (!isSafeAssetPath(p)) {
+    throw new TypeError(`pt-loader: ${label} must be a safe relative asset path`);
+  }
+  return p;
+}
+
 /** `"a/b/c.smd"` -> `"a/b/"`. Returns `""` when there is no directory part. */
 export function dirOf(path) {
   const p = normalize(path);
@@ -59,11 +91,11 @@ export function resolveAssetPath(folder, name, manifest) {
   if (manifest) {
     const get = manifest instanceof Map ? (k) => manifest.get(k) : (k) => manifest[k];
     const a = get(joined.toLowerCase());
-    if (a) return a;
+    if (a && isSafeAssetPath(a)) return normalize(a);
     const b = get(bare.toLowerCase());
-    if (b) return b;
+    if (b && isSafeAssetPath(b)) return normalize(b);
     return null;
   }
 
-  return joined;
+  return isSafeAssetPath(joined) ? joined : null;
 }

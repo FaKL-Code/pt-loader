@@ -4,6 +4,8 @@
  */
 export {
   BinaryReader,
+  assertSaneCounts,
+  assertRemaining,
   parsePAT3D,
   parseSMB,
   parseSTAGE3D,
@@ -24,6 +26,8 @@ export {
   stripExt,
   changeExt,
   resolveAssetPath,
+  isSafeAssetPath,
+  assertSafeAssetPath,
   motionStateName,
   SIZES,
   BLEND,

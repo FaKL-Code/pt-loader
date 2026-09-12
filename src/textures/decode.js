@@ -15,12 +15,13 @@ import { decodeTGA } from './tga.js';
  *
  * @param {ArrayBuffer|Uint8Array} buffer file bytes; mutated in place when encrypted
  * @param {string} [filename] used to disambiguate BMP from TGA
+ * @param {{maxPixels?: number}} [options]
  * @returns {{width:number, height:number, data:Uint8Array, hasAlpha:boolean, format:'bmp'|'tga'}}
  */
-export function decodeImage(buffer, filename = '') {
+export function decodeImage(buffer, filename = '', { maxPixels = 16 * 1024 * 1024 } = {}) {
   const u8 = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   const format = decryptImage(u8, filename);
-  const decoded = format === 'bmp' ? decodeBMP(u8) : decodeTGA(u8);
+  const decoded = format === 'bmp' ? decodeBMP(u8, { maxPixels }) : decodeTGA(u8, { maxPixels });
   return { ...decoded, format };
 }
 

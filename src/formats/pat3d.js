@@ -1,4 +1,4 @@
-import { BinaryReader, assertSaneCounts } from '../io/BinaryReader.js';
+import { BinaryReader, assertSaneCounts, assertRemaining } from '../io/BinaryReader.js';
 import { SIZES, OBJ_FRAME_SEARCH_MAX, FIXED, MAX_OBJECTS } from './constants.js';
 import {
   readSmdFileHeader,
@@ -199,6 +199,15 @@ export function readGeomObjectBody(r, obj) {
     tmPosCnt: obj.tmPosCnt,
     tmScaleCnt: obj.tmScaleCnt,
   });
+  const requiredBytes =
+    obj.nVertex * SIZES.VERTEX +
+    obj.nFace * SIZES.FACE +
+    obj.nTexLink * SIZES.TEXLINK +
+    obj.tmRotCnt * (20 + SIZES.MATRIX4) +
+    obj.tmPosCnt * SIZES.TRANS_POSITION +
+    obj.tmScaleCnt * SIZES.TRANS_SCALE +
+    (obj.lpPhysique !== 0 ? obj.nVertex * 32 : 0);
+  assertRemaining(r, requiredBytes, 'PAT3D object payload');
 
   for (let i = 0; i < obj.nVertex; i++) obj.vertices.push(readVertex(r));
   for (let i = 0; i < obj.nFace; i++) obj.faces.push(readFace(r));

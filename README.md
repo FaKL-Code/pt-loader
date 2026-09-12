@@ -200,6 +200,13 @@ to the GPU. DevTools will therefore always show that a request happened, and a
 determined authorized user can capture the response. Encryption or obfuscation
 with a key shipped to the browser only makes that process less convenient.
 
+The loader also applies defensive limits by default: 64 MiB per model/map/
+animation response, 32 MiB per texture response, 16 megapixels per decoded
+texture, 4 MiB per manifest and 64 MiB of retained input-buffer cache. Tune
+these limits for trusted, larger assets rather than disabling them globally.
+Logical asset paths are required to be relative and reject traversal, absolute
+filesystem paths and external URLs before a request is made.
+
 What can and should be enforced is **server-side access control**. Do not place
 private assets under `public/`, a public bucket, or a CDN URL that works without
 credentials. Route every manifest, model, skeleton, animation and texture
@@ -480,31 +487,34 @@ are still findable, which is the point of the sibling highlight.
 
 ### `new PTLoader(options)`
 
-| Option         | Type                    | Default | Meaning                        |
-| -------------- | ----------------------- | ------- | ------------------------------ |
-| `baseUrl`      | `string`                | `''`    | Prefix for every request       |
-| `manifest`     | `object \| Map \| null` | `null`  | Output of `pt-assets manifest` |
-| `fetch`        | `typeof fetch`          | global  | Custom fetch implementation    |
-| `requestInit`  | `object \| function`    | —       | Auth options for every asset   |
-| `textureCache` | `TextureCache`          | new one | Share a cache between loaders  |
-| `useWorker`    | `boolean`               | `false` | Parse off the main thread      |
-| `options`      | `PTBuildOptions`        | `{}`    | Defaults for every build       |
+| Option                | Type                    | Default | Meaning                              |
+| --------------------- | ----------------------- | ------- | ------------------------------------ |
+| `baseUrl`             | `string`                | `''`    | Prefix for every request             |
+| `manifest`            | `object \| Map \| null` | `null`  | Output of `pt-assets manifest`       |
+| `fetch`               | `typeof fetch`          | global  | Custom fetch implementation          |
+| `requestInit`         | `object \| function`    | —       | Auth options for every asset         |
+| `textureCache`        | `TextureCache`          | new one | Share a cache between loaders        |
+| `useWorker`           | `boolean`               | `false` | Parse off the main thread            |
+| `maxAssetBytes`       | `number`                | 64 MiB  | Maximum model/map/animation response |
+| `maxManifestBytes`    | `number`                | 4 MiB   | Maximum manifest response            |
+| `maxBufferCacheBytes` | `number`                | 64 MiB  | Input-buffer cache budget            |
+| `options`             | `PTBuildOptions`        | `{}`    | Defaults for every build             |
 
 **Methods**
 
-| Method                                   | Returns                 | Notes                                    |
-| ---------------------------------------- | ----------------------- | ---------------------------------------- |
-| `loadModel(path, opts?)`                 | `Promise<Group>`        | Items, weapons, props                    |
-| `loadCharacter(path, opts?)`             | `Promise<PTCharacter>`  | Mesh + skeleton + clips                  |
-| `loadStage(path, opts?)`                 | `Promise<Group>`        | Maps                                     |
-| `loadCollision(path, opts?)`             | `Promise<Mesh \| null>` | Invisible, indexed                       |
-| `pick(root, camera, pointer, opts?)`     | `PTPickResult \| null`  | Raycast + material metadata              |
-| `update(elapsedSeconds)`                 | `void`                  | Call once per frame                      |
-| `release(root)`                          | `void`                  | Dispose one object's GPU resources       |
-| `dispose()`                              | `void`                  | Dispose everything, terminate the worker |
-| `setManifest(m)`                         | `void`                  | Swap texture packs at runtime            |
-| `parsePAT3D/parseSTAGE3D/parseINX(path)` | `Promise<object>`       | Raw parsed data                          |
-| `PTLoader.loadManifest(url)`             | `Promise<object>`       | Static helper                            |
+| Method                                             | Returns                 | Notes                                                |
+| -------------------------------------------------- | ----------------------- | ---------------------------------------------------- |
+| `loadModel(path, opts?)`                           | `Promise<Group>`        | Items, weapons, props                                |
+| `loadCharacter(path, opts?)`                       | `Promise<PTCharacter>`  | Mesh + skeleton + clips                              |
+| `loadStage(path, opts?)`                           | `Promise<Group>`        | Maps                                                 |
+| `loadCollision(path, opts?)`                       | `Promise<Mesh \| null>` | Invisible, indexed                                   |
+| `pick(root, camera, pointer, opts?)`               | `PTPickResult \| null`  | Raycast + material metadata                          |
+| `update(elapsedSeconds)`                           | `void`                  | Call once per frame                                  |
+| `release(root)`                                    | `void`                  | Dispose one object's GPU resources                   |
+| `dispose()`                                        | `void`                  | Dispose everything, terminate the worker             |
+| `setManifest(m)`                                   | `void`                  | Swap texture packs at runtime                        |
+| `parsePAT3D/parseSTAGE3D/parseINX(path)`           | `Promise<object>`       | Raw parsed data                                      |
+| `loadManifest(url)` / `PTLoader.loadManifest(...)` | `Promise<object>`       | Fetch a bounded manifest (instance also installs it) |
 
 `loadModel` and `loadStage` accept `{ textureFolder }` to look textures up
 somewhere other than the model's own folder — this is how you swap texture packs
@@ -712,7 +722,7 @@ npm test
 npm run check
 ```
 
-68 tests cover byte offsets against synthetic fixtures, the crypto
+83 tests cover byte offsets against synthetic fixtures, the crypto
 round-trip, both image decoders, the 0.66 layout quirk, pointer relinking, the
 material rules, skinning, the rotation-delta accumulation, and surface picking.
 

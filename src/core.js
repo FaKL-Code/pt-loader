@@ -12,7 +12,7 @@
  * across a worker boundary or serialised to JSON directly.
  */
 
-export { BinaryReader, assertSaneCounts } from './io/BinaryReader.js';
+export { BinaryReader, assertSaneCounts, assertRemaining } from './io/BinaryReader.js';
 
 export {
   decryptImage,
@@ -58,4 +58,12 @@ export { decodeBMP } from './textures/bmp.js';
 export { decodeTGA } from './textures/tga.js';
 export { decodeImage } from './textures/decode.js';
 
-export { resolveAssetPath, dirOf, baseOf, stripExt, changeExt } from './util/paths.js';
+export {
+  resolveAssetPath,
+  isSafeAssetPath,
+  assertSafeAssetPath,
+  dirOf,
+  baseOf,
+  stripExt,
+  changeExt,
+} from './util/paths.js';

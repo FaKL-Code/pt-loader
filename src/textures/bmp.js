@@ -38,7 +38,7 @@ function maskToShiftScale(mask) {
  * @param {Uint8Array} u8 full, already-decrypted BMP file
  * @returns {{width:number, height:number, data:Uint8Array, hasAlpha:boolean}}
  */
-export function decodeBMP(u8) {
+export function decodeBMP(u8, { maxPixels = 16 * 1024 * 1024 } = {}) {
   if (u8.length < 26 || u8[0] !== 0x42 || u8[1] !== 0x4d) {
     throw new Error('pt-loader: not a BMP (missing "BM" magic — was it decrypted?)');
   }
@@ -76,12 +76,19 @@ export function decodeBMP(u8) {
   if (width <= 0 || height <= 0 || width > 16384 || height > 16384) {
     throw new Error(`pt-loader: implausible BMP dimensions ${width}x${height}`);
   }
+  assertPixelLimit(width, height, maxPixels, 'BMP');
 
   // ---- palette ----
   const paletteOffset = 14 + dibSize + (compression === BI_BITFIELDS && dibSize === 40 ? 12 : 0);
   let palette = null;
   if (bitCount <= 8) {
     const count = clrUsed || 1 << bitCount;
+    if (!Number.isInteger(count) || count <= 0 || count > 256) {
+      throw new Error(`pt-loader: implausible BMP palette size ${count}`);
+    }
+    if (paletteOffset < 0 || paletteOffset + count * paletteEntrySize > u8.length) {
+      throw new Error('pt-loader: truncated BMP palette');
+    }
     palette = new Uint8Array(count * 4);
     for (let i = 0; i < count; i++) {
       const o = paletteOffset + i * paletteEntrySize;
@@ -212,6 +219,17 @@ export function decodeBMP(u8) {
   }
 
   return { width, height, data: out, hasAlpha };
+}
+
+function assertPixelLimit(width, height, maxPixels, format) {
+  if (!Number.isSafeInteger(maxPixels) || maxPixels <= 0) {
+    throw new RangeError('pt-loader: maxPixels must be a positive integer');
+  }
+  if (width * height > maxPixels) {
+    throw new RangeError(
+      `pt-loader: ${format} dimensions ${width}x${height} exceed the ${maxPixels}-pixel limit`,
+    );
+  }
 }
 
 /** BI_RLE8 / BI_RLE4 decoder. */

@@ -17,7 +17,15 @@ import { decodeBMP } from '../src/textures/bmp.js';
 import { decodeTGA } from '../src/textures/tga.js';
 import { decodeImage } from '../src/textures/decode.js';
 import { SIZES, INX_SIZE_CLASSIC, FRAMES_PER_TICK } from '../src/formats/constants.js';
-import { resolveAssetPath, changeExt, dirOf, baseOf, stripExt } from '../src/util/paths.js';
+import {
+  resolveAssetPath,
+  changeExt,
+  dirOf,
+  baseOf,
+  stripExt,
+  isSafeAssetPath,
+  assertSafeAssetPath,
+} from '../src/util/paths.js';
 
 import { buildPAT3D, buildSTAGE3D, buildINX, buildBMP, buildTGA, W } from './helpers/write.js';
 
@@ -256,6 +264,24 @@ test('decodeImage: decrypts before decoding', () => {
   assert.deepEqual([...data.slice(0, 4)], [255, 0, 0, 255]);
 });
 
+test('image decoders reject oversized pixel dimensions before allocating', () => {
+  const bmp = new Uint8Array(
+    buildBMP(2, 2, [
+      [RED, GREEN],
+      [BLUE, WHITE],
+    ]),
+  );
+  assert.throws(() => decodeBMP(bmp, { maxPixels: 3 }), /pixel limit/);
+
+  const tga = new Uint8Array(
+    buildTGA(2, 2, [
+      [RED, GREEN],
+      [BLUE, WHITE],
+    ]),
+  );
+  assert.throws(() => decodeTGA(tga, { maxPixels: 3 }), /pixel limit/);
+});
+
 // ----------------------------------------------------------------- paths ---
 
 test('paths: helpers normalise Windows separators', () => {
@@ -279,4 +305,12 @@ test('paths: manifest lookup is case-insensitive and falls back to the basename'
   assert.equal(resolveAssetPath('field/forest/', 'shared.tga', manifest), 'common/Shared.TGA');
   assert.equal(resolveAssetPath('field/forest/', 'missing.bmp', manifest), null);
   assert.equal(resolveAssetPath('a/', 'b.bmp', null), 'a/b.bmp');
+});
+
+test('paths: asset requests reject traversal and external URLs', () => {
+  assert.equal(isSafeAssetPath('field/forest/rock.png'), true);
+  assert.equal(isSafeAssetPath('../private/secret.smd'), false);
+  assert.equal(isSafeAssetPath('https://example.test/secret.smd'), false);
+  assert.equal(resolveAssetPath('../private/', 'secret.bmp', null), null);
+  assert.throws(() => assertSafeAssetPath('../private/secret.smd'), /safe relative/);
 });

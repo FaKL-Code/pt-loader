@@ -13,7 +13,7 @@
  * @param {Uint8Array} u8 full, already-decrypted TGA file
  * @returns {{width:number, height:number, data:Uint8Array, hasAlpha:boolean}}
  */
-export function decodeTGA(u8) {
+export function decodeTGA(u8, { maxPixels = 16 * 1024 * 1024 } = {}) {
   if (u8.length < 18) throw new Error('pt-loader: TGA shorter than its 18-byte header');
   const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
 
@@ -33,6 +33,14 @@ export function decodeTGA(u8) {
 
   if (width <= 0 || height <= 0 || width > 16384 || height > 16384) {
     throw new Error(`pt-loader: implausible TGA dimensions ${width}x${height}`);
+  }
+  if (!Number.isSafeInteger(maxPixels) || maxPixels <= 0) {
+    throw new RangeError('pt-loader: maxPixels must be a positive integer');
+  }
+  if (width * height > maxPixels) {
+    throw new RangeError(
+      `pt-loader: TGA dimensions ${width}x${height} exceed the ${maxPixels}-pixel limit`,
+    );
   }
 
   const rle = imageType >= 9 && imageType <= 11;
