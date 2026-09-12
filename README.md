@@ -331,9 +331,14 @@ disclosure but is not a security boundary.
 
 ### Publishing releases to npm
 
-`.github/workflows/publish.yml` publishes when a tag such as `v0.1.2` is pushed.
-The tag must match the `version` in `package.json`. It also supports manually
-dispatching the workflow for an existing release tag.
+Every push to `main` starts `.github/workflows/publish.yml`. The workflow bumps
+the patch version, commits the updated `package.json` and lockfile, creates a
+matching `vX.Y.Z` tag, and publishes that version to npm. Pushes to other
+branches do not publish. The workflow also supports manually dispatching an
+existing release tag (for example, to retry a publish).
+
+The repository rules must allow the GitHub Actions bot to push release commits
+and tags to `main`.
 
 Before the first automated publish, create a granular npm access token with
 package publish permission and the **bypass 2FA** option. Add it to the GitHub

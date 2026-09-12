@@ -11,6 +11,11 @@ the project follows [Semantic Versioning](https://semver.org/).
 - `PTPreviewClient` and the `pt-preview-v1` contract for server-rendered
   previews that keep original models and textures off the browser.
 
+### Changed
+
+- Pushes to `main` now create patch release tags and publish automatically to
+  npm.
+
 ## [0.1.2] - 2026-09-11
 
 ### Changed
