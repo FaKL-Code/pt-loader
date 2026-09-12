@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * pt-assets — asset preparation for @jpstale/pt-loader.
+ * pt-assets — asset preparation for @fakl-code/pt-loader.
  *
  * Zero dependencies: PNG encoding uses node:zlib.
  *
@@ -21,7 +21,7 @@ import { parseINX } from '../src/formats/inx.js';
 import { SIZES } from '../src/formats/constants.js';
 
 const USAGE = `
-pt-assets — asset preparation for @jpstale/pt-loader
+pt-assets — asset preparation for @fakl-code/pt-loader
 
   pt-assets manifest <dir> [--out manifest.json]
       Walk <dir> and write a lower-cased path index. Required in production:

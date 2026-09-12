@@ -1,6 +1,6 @@
 {
-  "name": "@jpstale/pt-loader",
-  "version": "0.1.1",
+  "name": "@fakl-code/pt-loader",
+  "version": "0.1.2",
   "description": "Loader for Priston Tale 3D assets (SMD / SMB / INX / encrypted BMP & TGA) targeting three.js.",
   "type": "module",
   "license": "MIT",

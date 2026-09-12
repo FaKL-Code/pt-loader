@@ -6,6 +6,13 @@ the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-11
+
+### Changed
+
+- Renamed the npm package scope to `@fakl-code/pt-loader`.
+- Added automated publishing for version tags through GitHub Actions.
+
 ## [0.1.1] - 2026-09-11
 
 ### Added
@@ -30,6 +37,7 @@ the project follows [Semantic Versioning](https://semver.org/).
   generation.
 - TypeScript declarations and a 68-test suite.
 
-[Unreleased]: https://github.com/FaKL-Code/pt-loader/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/FaKL-Code/pt-loader/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/FaKL-Code/pt-loader/releases/tag/v0.1.2
 [0.1.1]: https://github.com/FaKL-Code/pt-loader/releases/tag/v0.1.1
 [0.1.0]: https://github.com/FaKL-Code/pt-loader/releases/tag/v0.1.0

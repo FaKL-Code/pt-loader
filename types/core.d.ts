@@ -1,5 +1,5 @@
 /**
- * `@jpstale/pt-loader/core` — parsers and image decoders with no three.js
+ * `@fakl-code/pt-loader/core` — parsers and image decoders with no three.js
  * dependency. Everything here is also re-exported from the package root.
  */
 export {

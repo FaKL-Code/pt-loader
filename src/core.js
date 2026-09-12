@@ -1,5 +1,5 @@
 /**
- * `@jpstale/pt-loader/core` — the binary parsers and image decoders, with **no
+ * `@fakl-code/pt-loader/core` — the binary parsers and image decoders, with **no
  * three.js dependency**.
  *
  * Use this entry point when you need the data but not the scene graph:

@@ -20,7 +20,7 @@ import type {
 } from 'three';
 
 // ===========================================================================
-// Parsed data (no three.js involved) — also exported from `@jpstale/pt-loader/core`
+// Parsed data (no three.js involved) — also exported from `@fakl-code/pt-loader/core`
 // ===========================================================================
 
 /** One vertex of a PAT3D mesh. Values are already divided by 256. */

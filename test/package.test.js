@@ -18,6 +18,7 @@ async function walk(dir, out = []) {
 test('published entry points use minified dist files and exclude source', async () => {
   const pkg = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8'));
 
+  assert.equal(pkg.name, '@fakl-code/pt-loader');
   assert.equal(pkg.exports['.'].import, './dist/index.js');
   assert.equal(pkg.exports['./core'].import, './dist/core.js');
   assert.equal(pkg.exports['./viewer'].import, './dist/viewer.js');

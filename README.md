@@ -1,4 +1,4 @@
-# @jpstale/pt-loader
+# @fakl-code/pt-loader
 
 [![CI](https://github.com/FaKL-Code/pt-loader/actions/workflows/ci.yml/badge.svg)](https://github.com/FaKL-Code/pt-loader/actions/workflows/ci.yml)
 [![Node.js 18+](https://img.shields.io/badge/node-%3E%3D18-5fa04e)](https://nodejs.org/)
@@ -12,7 +12,7 @@ Published as minified ESM without source maps. `three` is a peer dependency and
 no game assets are included.
 
 ```js
-import { PTLoader } from '@jpstale/pt-loader';
+import { PTLoader } from '@fakl-code/pt-loader';
 
 const loader = new PTLoader({ baseUrl: '/pt-assets/', manifest });
 scene.add(await loader.loadModel('image/Sinimage/Items/DropItem/it0123.smd'));
@@ -44,8 +44,8 @@ Install the tagged GitHub release:
 npm install github:FaKL-Code/pt-loader#v0.1.0 three
 ```
 
-The package name is `@jpstale/pt-loader`; a registry release can be installed
-with `npm install @jpstale/pt-loader three` once it is published to npm.
+The package name is `@fakl-code/pt-loader`; a registry release can be installed
+with `npm install @fakl-code/pt-loader three` once it is published to npm.
 
 Requirements:
 
@@ -84,11 +84,11 @@ copy of `three` used by the test suite.
 
 ### Entry points
 
-| Import                      | Contents                                               | Needs `three` |
-| --------------------------- | ------------------------------------------------------ | ------------- |
-| `@jpstale/pt-loader`        | `PTLoader`, the three.js build layer, everything below | yes           |
-| `@jpstale/pt-loader/viewer` | `PTViewer` — a ready-made canvas                       | yes           |
-| `@jpstale/pt-loader/core`   | parsers and image decoders only                        | **no**        |
+| Import                        | Contents                                               | Needs `three` |
+| ----------------------------- | ------------------------------------------------------ | ------------- |
+| `@fakl-code/pt-loader`        | `PTLoader`, the three.js build layer, everything below | yes           |
+| `@fakl-code/pt-loader/viewer` | `PTViewer` — a ready-made canvas                       | yes           |
+| `@fakl-code/pt-loader/core`   | parsers and image decoders only                        | **no**        |
 
 Use `/core` inside a Web Worker, in Node, or in tests.
 
@@ -156,7 +156,7 @@ PAT3D  imp.smd  (184232 bytes)
 
 ```js
 import * as THREE from 'three';
-import { PTLoader } from '@jpstale/pt-loader';
+import { PTLoader } from '@fakl-code/pt-loader';
 
 const manifest = await PTLoader.loadManifest('/pt-assets/manifest.json');
 const loader = new PTLoader({ baseUrl: '/pt-assets/', manifest });
@@ -177,7 +177,7 @@ is cheap and safe to call unconditionally.
 ### B. You just want a canvas showing a model
 
 ```js
-import { PTViewer } from '@jpstale/pt-loader/viewer';
+import { PTViewer } from '@fakl-code/pt-loader/viewer';
 
 const viewer = new PTViewer('#item-canvas', {
   baseUrl: '/pt-assets/',
@@ -299,7 +299,7 @@ swapped, because the game compiles those text scripts into the binary index.
 ```jsx
 import { useEffect, useState } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
-import { PTLoader } from '@jpstale/pt-loader';
+import { PTLoader } from '@fakl-code/pt-loader';
 
 const loader = new PTLoader({ baseUrl: '/pt-assets/', manifest });
 
@@ -386,7 +386,7 @@ viewer.onPick(async (hit) => {
 Driving your own camera and input instead of `PTViewer`:
 
 ```js
-import { PTLoader, pointerToNDC, PTHighlight } from '@jpstale/pt-loader';
+import { PTLoader, pointerToNDC, PTHighlight } from '@fakl-code/pt-loader';
 
 const highlight = new PTHighlight();
 
@@ -587,12 +587,12 @@ recomputes `bindMatrixInverse` each frame in attached bind mode. Do not call
 
 ## Node / offline pipeline
 
-`@jpstale/pt-loader/core` runs in Node with no three.js and no DOM, which is
+`@fakl-code/pt-loader/core` runs in Node with no three.js and no DOM, which is
 what makes an offline glTF/GLB pipeline practical without maintaining a second
 parser:
 
 ```js
-import { parsePAT3D, parseINX, decodeImage } from '@jpstale/pt-loader/core';
+import { parsePAT3D, parseINX, decodeImage } from '@fakl-code/pt-loader/core';
 import { readFile } from 'node:fs/promises';
 
 const pat = parsePAT3D(await readFile('imp.smd'));

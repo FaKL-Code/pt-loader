@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve `@jpstale/pt-loader`.
+Thanks for helping improve `@fakl-code/pt-loader`.
 
 ## Development setup
 
