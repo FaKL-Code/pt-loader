@@ -14,7 +14,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: npm-release
@@ -56,37 +56,26 @@ jobs:
           MANUAL_TAG: ${{ inputs.tag || '' }}
         run: |
           if [[ "$RELEASE_EVENT" == "push" && "$GITHUB_REF" == "refs/heads/main" ]]; then
-            npm version patch --no-git-tag-version
-            version="$(node -p "require('./package.json').version")"
+            package_name="$(node -p "require('./package.json').name")"
+            latest="$(npm view "$package_name" version)"
+            version="$(node -e '
+              const [major, minor, patch] = process.argv[1].split(".").map(Number);
+              if (![major, minor, patch].every(Number.isInteger)) process.exit(1);
+              console.log(`${major}.${minor}.${patch + 1}`);
+            ' "$latest")"
             tag="v$version"
           else
             tag="${MANUAL_TAG:-$GITHUB_REF_NAME}"
-            version="$(node -p "require('./package.json').version")"
-            expected="v$version"
-            test "$expected" = "$tag" || {
-              echo "Tag $tag does not match package version $expected" >&2
-              exit 1
-            }
+            version="${tag#v}"
           fi
+
+          npm version "$version" --no-git-tag-version --allow-same-version
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Validate release
         run: npm run check
-
-      - name: Commit and tag automatic release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          git commit -m "chore(release): $RELEASE_TAG [skip ci]"
-          git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
-          git push origin HEAD:main
-          git push origin "$RELEASE_TAG"
 
       - name: Check npm publish token
         env:

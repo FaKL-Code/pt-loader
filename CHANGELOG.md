@@ -13,8 +13,7 @@ the project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Pushes to `main` now create patch release tags and publish automatically to
-  npm.
+- Pushes to `main` now create patch releases and publish automatically to npm.
 
 ## [0.1.2] - 2026-09-11
 

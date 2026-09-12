@@ -331,14 +331,13 @@ disclosure but is not a security boundary.
 
 ### Publishing releases to npm
 
-Every push to `main` starts `.github/workflows/publish.yml`. The workflow bumps
-the patch version, commits the updated `package.json` and lockfile, creates a
-matching `vX.Y.Z` tag, and publishes that version to npm. Pushes to other
-branches do not publish. The workflow also supports manually dispatching an
-existing release tag (for example, to retry a publish).
-
-The repository rules must allow the GitHub Actions bot to push release commits
-and tags to `main`.
+Every push to `main` starts `.github/workflows/publish.yml`. The workflow reads
+the latest published version, increments the patch number in its isolated CI
+workspace, validates the package, and publishes that version to npm. This keeps
+the protected `main` branch unchanged while still creating a new npm version
+for every deploy. Pushes to other branches do not publish. The workflow also
+supports manually dispatching an existing release tag (for example, to retry a
+publish).
 
 Before the first automated publish, create a granular npm access token with
 package publish permission and the **bypass 2FA** option. Add it to the GitHub
