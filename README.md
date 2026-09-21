@@ -48,6 +48,11 @@ npm install github:FaKL-Code/pt-loader#v0.1.0 three
 The package name is `@fakl-code/pt-loader`; a registry release can be installed
 with `npm install @fakl-code/pt-loader three` once it is published to npm.
 
+Releases are automated: every merge or push to protected `main` publishes the
+next patch version to npm and creates the matching GitHub Release. If a release
+must be retried manually, dispatch the publish workflow against an existing
+`v*.*.*` tag instead of publishing an untracked local version.
+
 Requirements:
 
 |         |                                                                                  |
