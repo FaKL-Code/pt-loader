@@ -14,6 +14,9 @@ the project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `PTPreviewViewer` now supports a display-only turntable mode with bounded
+  render FPS and model-axis rotation, while retaining the interactive orbit
+  mode for detail views.
 - Preview viewers now abort obsolete in-flight frames, and preview server
   callbacks receive the validated viewport plus an abort signal so CPU
   renderers can skip stale work before rasterisation or image encoding.

@@ -353,6 +353,24 @@ JPEG/WebP bytes directly. Avoid a PNG screenshot followed by a second image
 encode on every frame—this commonly costs more than the actual draw on a
 SwiftShader/CPU renderer.
 
+For catalog cards or other display-only slots, use the built-in turntable mode:
+
+```js
+const preview = new PTPreviewViewer(image, {
+  client,
+  interaction: 'none',
+  autoRotate: true,
+  autoRotateSpeed: 0.7,
+  autoRotateFps: 8,
+});
+await preview.open('item_123', { width: 320, height: 240 });
+```
+
+This disables mouse/touch controls and advances only the model's Y-axis
+rotation. Keep the FPS and viewport modest when several cards are visible at once;
+for large catalogs, pre-rendered turntables or static thumbnails are more
+efficient than maintaining one live server session per card.
+
 For a framework-neutral Fetch API handler, use the Node-only entry point:
 
 ```js

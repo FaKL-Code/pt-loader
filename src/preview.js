@@ -251,7 +251,7 @@ const DEFAULT_PREVIEW_CAMERA = Object.freeze({
 });
 
 /**
- * Interactive image surface for a {@link PTPreviewClient}.
+ * Server-rendered image surface for a {@link PTPreviewClient}.
  *
  * This keeps all browser interaction in the package: the consumer supplies an
  * image element and a preview client, while the original model and textures
@@ -266,6 +266,11 @@ export class PTPreviewViewer {
    * @param {PTPreviewClient} options.client preview client used for frames
    * @param {Partial<typeof DEFAULT_PREVIEW_CAMERA>} [options.camera]
    * @param {object} [options.transform] root position, rotation and scale sent to the server
+   * @param {'orbit'|'none'} [options.interaction='orbit'] pointer interaction mode;
+   *   use `'none'` for a display-only viewport
+   * @param {boolean} [options.autoRotate=false] rotate the model around its Y axis
+   * @param {number} [options.autoRotateSpeed=0.5] radians per second
+   * @param {number} [options.autoRotateFps=12] maximum turntable requests per second
    * @param {(camera: Record<string, number>, transform: object) => Record<string, unknown>} [options.state]
    * @param {(error: unknown) => void} [options.onError]
    */
@@ -275,6 +280,10 @@ export class PTPreviewViewer {
       client,
       camera = {},
       transform = {},
+      interaction = 'orbit',
+      autoRotate = false,
+      autoRotateSpeed = 0.5,
+      autoRotateFps = 12,
       state = (nextCamera, nextTransform) => ({
         camera: { ...nextCamera },
         transform: clonePreviewTransform(nextTransform),
@@ -289,11 +298,24 @@ export class PTPreviewViewer {
     }
     if (typeof state !== 'function')
       throw new TypeError('pt-loader: preview state must be a function');
+    if (interaction !== 'orbit' && interaction !== 'none') {
+      throw new TypeError('pt-loader: preview interaction must be "orbit" or "none"');
+    }
+    if (!Number.isFinite(autoRotateSpeed)) {
+      throw new RangeError('pt-loader: preview autoRotateSpeed must be finite');
+    }
+    if (!Number.isFinite(autoRotateFps) || autoRotateFps <= 0 || autoRotateFps > 60) {
+      throw new RangeError('pt-loader: preview autoRotateFps must be between 0 and 60');
+    }
 
     this.element = element;
     this.client = client;
     this.camera = { ...DEFAULT_PREVIEW_CAMERA, ...camera };
     this.transform = clonePreviewTransform(transform);
+    this.interaction = interaction;
+    this.autoRotate = Boolean(autoRotate);
+    this.autoRotateSpeed = autoRotateSpeed;
+    this.autoRotateFps = autoRotateFps;
     this.state = state;
     this.onError = onError;
     this._disposed = false;
@@ -303,6 +325,11 @@ export class PTPreviewViewer {
     this._drainResolve = null;
     this._drainReject = null;
     this._renderController = null;
+    this._autoRotateTimer = null;
+    this._autoRotateActive = false;
+    this._autoRotateLast = 0;
+    this._autoRotateAngle = 0;
+    this._autoRotateBaseRotation = null;
     this._ownedUrl = null;
     this._bindControls();
   }
@@ -310,10 +337,13 @@ export class PTPreviewViewer {
   /** Open a server session and render its first frame. */
   async open(assetId, options = {}) {
     this.#assertActive();
+    this.#stopAutoRotate();
     const generation = ++this._generation;
     await this.client.open(assetId, options);
     if (generation !== this._generation || this._disposed) return null;
-    return this.requestRender();
+    const frame = await this.requestRender();
+    this.#startAutoRotate();
+    return frame;
   }
 
   /** Update camera values and request the newest frame. */
@@ -330,12 +360,22 @@ export class PTPreviewViewer {
   setTransform(values, { render = true } = {}) {
     this.#assertActive();
     this.transform = clonePreviewTransform(values);
+    if (this._autoRotateActive) this.#captureAutoRotateBase();
     return render ? this.requestRender() : Promise.resolve(null);
   }
 
   /** Restore the default orbit camera. */
   resetCamera({ render = true } = {}) {
     return this.setCamera(DEFAULT_PREVIEW_CAMERA, { render });
+  }
+
+  /** Enable or disable the server-rendered turntable loop. */
+  setAutoRotate(enabled, { render = true } = {}) {
+    this.#assertActive();
+    this.autoRotate = Boolean(enabled);
+    if (this.autoRotate) this.#startAutoRotate();
+    else this.#stopAutoRotate();
+    return render ? this.requestRender() : Promise.resolve(null);
   }
 
   /** Render immediately, without changing the camera. */
@@ -386,6 +426,7 @@ export class PTPreviewViewer {
     this._generation += 1;
     this._queued = false;
     this._renderController?.abort();
+    this.#stopAutoRotate();
     this._unbindControls?.();
     if (this._ownedUrl && typeof URL.revokeObjectURL === 'function')
       URL.revokeObjectURL(this._ownedUrl);
@@ -451,6 +492,11 @@ export class PTPreviewViewer {
     image.style.userSelect = 'none';
     image.style.webkitUserDrag = 'none';
 
+    if (this.interaction === 'none') {
+      this._unbindControls = () => {};
+      return;
+    }
+
     const interaction = { pointerId: null, startX: 0, startY: 0, initial: null, pan: false };
     const stop = (event) => {
       if (interaction.pointerId !== event.pointerId) return;
@@ -514,6 +560,54 @@ export class PTPreviewViewer {
       image.removeEventListener('contextmenu', onContextMenu);
       image.removeEventListener('dragstart', onDragStart);
     };
+  }
+
+  #startAutoRotate() {
+    if (!this.autoRotate || this._autoRotateActive || this._disposed) return;
+    this._autoRotateActive = true;
+    this._autoRotateLast = 0;
+    this.#captureAutoRotateBase();
+    this._autoRotateTimer = setTimeout(
+      () => void this.#autoRotateTick(),
+      1000 / this.autoRotateFps,
+    );
+  }
+
+  #stopAutoRotate() {
+    this._autoRotateActive = false;
+    if (this._autoRotateTimer !== null) clearTimeout(this._autoRotateTimer);
+    this._autoRotateTimer = null;
+    this._autoRotateLast = 0;
+  }
+
+  #captureAutoRotateBase() {
+    this._autoRotateBaseRotation = this.transform.rotation
+      ? [...this.transform.rotation]
+      : [0, 0, 0];
+    this._autoRotateAngle = 0;
+  }
+
+  async #autoRotateTick() {
+    if (!this._autoRotateActive || this._disposed) return;
+    const now = performance.now();
+    const previous = this._autoRotateLast || now;
+    this._autoRotateLast = now;
+    this._autoRotateAngle +=
+      this.autoRotateSpeed * Math.min(0.25, Math.max(0, now - previous) / 1000);
+    const rotation = [...this._autoRotateBaseRotation];
+    rotation[1] += this._autoRotateAngle;
+    this.transform = { ...this.transform, rotation };
+    try {
+      await this.requestRender();
+    } catch (error) {
+      if (!isAbortError(error) && !this._disposed) this.onError?.(error);
+    }
+    if (this._autoRotateActive && !this._disposed) {
+      this._autoRotateTimer = setTimeout(
+        () => void this.#autoRotateTick(),
+        1000 / this.autoRotateFps,
+      );
+    }
   }
 }
 

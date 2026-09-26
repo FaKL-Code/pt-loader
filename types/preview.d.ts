@@ -48,6 +48,14 @@ export interface PTPreviewViewerOptions {
   camera?: Partial<PTPreviewCamera>;
   /** Root transform sent in the default server-render state. */
   transform?: PTTransform;
+  /** `'none'` disables pointer/touch controls for a display-only viewport. */
+  interaction?: 'orbit' | 'none';
+  /** Start the server-rendered turntable after `open()`. */
+  autoRotate?: boolean;
+  /** Turntable speed in radians per second. */
+  autoRotateSpeed?: number;
+  /** Maximum turntable render requests per second (1–60). */
+  autoRotateFps?: number;
   state?: (camera: PTPreviewCamera, transform: PTTransform) => Record<string, unknown>;
   onError?: (error: unknown) => void;
 }
@@ -81,8 +89,8 @@ export class PTPreviewClient {
 }
 
 /**
- * Pointer-controlled image viewer for server-rendered frames. The browser
- * receives only image frames; model and texture bytes remain server-side.
+ * Image viewer for server-rendered frames. It supports pointer orbit controls
+ * or a display-only turntable; the browser receives only image frames.
  */
 export class PTPreviewViewer {
   constructor(target: HTMLElement | string, options: PTPreviewViewerOptions);
@@ -97,6 +105,7 @@ export class PTPreviewViewer {
   ): Promise<PTPreviewFrame | null>;
   setTransform(values: PTTransform, options?: { render?: boolean }): Promise<PTPreviewFrame | null>;
   resetCamera(options?: { render?: boolean }): Promise<PTPreviewFrame | null>;
+  setAutoRotate(enabled: boolean, options?: { render?: boolean }): Promise<PTPreviewFrame | null>;
   render(options?: { signal?: AbortSignal }): Promise<PTPreviewFrame>;
   requestRender(): Promise<PTPreviewFrame | null>;
   dispose(): void;

@@ -261,6 +261,35 @@ test('preview viewer aborts a stale in-flight frame before rendering the latest 
   viewer.dispose();
 });
 
+test('preview viewer supports a display-only turntable without pointer handlers', async () => {
+  const image = fakeImage();
+  const states = [];
+  const client = {
+    open: async () => ({ sessionId: 's1', expiresAt: null }),
+    render: async (state) => {
+      states.push(state);
+      return { blob: new Blob([1]), url: 'blob:turntable', contentType: 'image/webp' };
+    },
+    dispose() {},
+  };
+  const viewer = new PTPreviewViewer(image, {
+    client,
+    interaction: 'none',
+    autoRotate: true,
+    autoRotateSpeed: 8,
+    autoRotateFps: 30,
+  });
+
+  await viewer.open('item_123');
+  image.dispatch('pointerdown', pointer({ pointerId: 1, clientX: 100, clientY: 100 }));
+  image.dispatch('pointermove', pointer({ pointerId: 1, clientX: 220, clientY: 80 }));
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  viewer.dispose();
+
+  assert.ok(states.length >= 2);
+  assert.ok(states.some((state) => state.transform.rotation?.[1] > 0));
+});
+
 function fakeImage() {
   const listeners = new Map();
   let captured = null;
