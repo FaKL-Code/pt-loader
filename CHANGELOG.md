@@ -24,6 +24,8 @@ the project follows [Semantic Versioning](https://semver.org/).
   package, type, build or CI changes.
 - The local release-discipline check now includes staged and working-tree
   changes, matching the enforcement performed in CI.
+- The release workflow now explicitly allows its isolated `package.json` version
+  bump while continuing to require documentation for package changes.
 
 ## [0.1.2] - 2026-09-11
 

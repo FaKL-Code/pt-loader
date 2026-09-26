@@ -77,6 +77,8 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Validate release
+        env:
+          RELEASE_BUILD: '1'
         run: npm run check
 
       - name: Check npm publish token
