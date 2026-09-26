@@ -4,10 +4,14 @@ export interface PTPreviewServerContext {
   request: Request;
   assetId: string;
   kind: PTPreviewKind;
+  viewport: { width: number; height: number; pixelRatio: number };
+  options: Record<string, unknown>;
 }
 
 export interface PTPreviewRenderContext {
   request: Request;
+  /** Aborts when the browser supersedes or cancels this render request. */
+  signal: AbortSignal;
   /** Private value returned by `resolveAsset`; never sent to the client. */
   asset: unknown;
   assetId: string;

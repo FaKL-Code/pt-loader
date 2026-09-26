@@ -19,8 +19,8 @@ const FRAME_TYPES = new Set(['image/avif', 'image/jpeg', 'image/png', 'image/web
  * storage. Their return values are never serialised into the browser response.
  *
  * @param {object} opts
- * @param {(context: {request: Request, assetId: string, kind: string}) => unknown|Promise<unknown>} opts.resolveAsset
- * @param {(context: {request: Request, asset: unknown, assetId: string, kind: string, viewport: object, options: object, state: object, principal: unknown}) => {body: ArrayBuffer|Uint8Array|Blob, contentType: string}|Promise<{body: ArrayBuffer|Uint8Array|Blob, contentType: string}>} opts.renderFrame
+ * @param {(context: {request: Request, assetId: string, kind: string, viewport: object, options: object}) => unknown|Promise<unknown>} opts.resolveAsset
+ * @param {(context: {request: Request, signal: AbortSignal, asset: unknown, assetId: string, kind: string, viewport: object, options: object, state: object, principal: unknown}) => {body: ArrayBuffer|Uint8Array|Blob, contentType: string}|Promise<{body: ArrayBuffer|Uint8Array|Blob, contentType: string}>} opts.renderFrame
  * @param {(request: Request) => unknown|Promise<unknown>} [opts.authenticate] return null/false to reject
  * @param {(principal: unknown) => string} [opts.principalKey]
  * @param {string} [opts.basePath='/api/previews']
@@ -112,6 +112,8 @@ export function createPreviewHandler({
       request,
       assetId: body.assetId,
       kind: body.kind,
+      viewport: body.viewport,
+      options: body.options,
     });
     if (asset === null || asset === undefined || asset === false) {
       return json({ error: 'not_found' }, 404);
@@ -148,6 +150,7 @@ export function createPreviewHandler({
 
     const result = await renderFrame({
       request,
+      signal: request.signal,
       asset: session.asset,
       assetId: session.assetId,
       kind: session.kind,

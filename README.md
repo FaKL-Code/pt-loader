@@ -343,6 +343,16 @@ endpoints. For fluid interaction, the same contract can be backed by a
 WebSocket or WebRTC transport; the HTTP client is the simple reference
 transport.
 
+For CPU-only renderers, keep the render loop session-scoped and cancel obsolete
+work. `PTPreviewViewer` aborts an in-flight frame when a newer pointer state is
+queued; `createPreviewHandler` exposes that cancellation as `signal` on the
+`renderFrame` context. The `resolveAsset` callback also receives the validated
+`viewport` and `options`, so a renderer can allocate the requested size once per
+session. Reuse the parsed model, decoded textures and camera bounds, and return
+JPEG/WebP bytes directly. Avoid a PNG screenshot followed by a second image
+encode on every frame—this commonly costs more than the actual draw on a
+SwiftShader/CPU renderer.
+
 For a framework-neutral Fetch API handler, use the Node-only entry point:
 
 ```js

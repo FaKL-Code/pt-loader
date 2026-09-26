@@ -118,13 +118,16 @@ test('preview server binds sessions to a principal and never returns private ass
   const handler = createPreviewHandler({
     basePath: '/api/previews',
     authenticate: async (request) => request.headers.get('x-user'),
-    resolveAsset: async ({ assetId }) => {
+    resolveAsset: async ({ assetId, viewport, options }) => {
       requests.push(assetId);
+      assert.deepEqual(viewport, { width: 320, height: 240, pixelRatio: 1 });
+      assert.deepEqual(options, {});
       return { privatePath: `/srv/private/${assetId}.smd` };
     },
-    renderFrame: async ({ asset, state }) => {
+    renderFrame: async ({ asset, state, signal }) => {
       assert.equal(asset.privatePath, '/srv/private/item_123.smd');
       assert.deepEqual(state, { camera: { azimuth: 1 } });
+      assert.ok(signal instanceof AbortSignal);
       return { body: new Uint8Array([9, 8, 7]), contentType: 'image/webp' };
     },
   });
@@ -221,6 +224,40 @@ test('preview viewer owns pointer controls and coalesces server frames', async (
   assert.deepEqual(states.at(-1).camera, viewer.camera);
   assert.deepEqual(states.at(-1).transform.position, [1, 2, 3]);
   assert.deepEqual(viewer.transform.scale, [1.25, 1.25, 1.25]);
+  viewer.dispose();
+});
+
+test('preview viewer aborts a stale in-flight frame before rendering the latest state', async () => {
+  const image = fakeImage();
+  let calls = 0;
+  let aborted = false;
+  const client = {
+    open: async () => ({ sessionId: 's1', expiresAt: null }),
+    render: async (_state, { signal }) => {
+      calls += 1;
+      if (calls === 1) {
+        return new Promise((resolve, reject) => {
+          signal.addEventListener('abort', () => {
+            aborted = true;
+            const error = new Error('aborted');
+            error.name = 'AbortError';
+            reject(error);
+          });
+        });
+      }
+      return { blob: new Blob([1]), url: 'blob:latest', contentType: 'image/webp' };
+    },
+    dispose() {},
+  };
+  const viewer = new PTPreviewViewer(image, { client });
+  await client.open();
+  const first = viewer.requestRender();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await viewer.setCamera({ azimuth: 0.5 });
+  await first;
+
+  assert.equal(aborted, true);
+  assert.equal(calls, 2);
   viewer.dispose();
 });
 

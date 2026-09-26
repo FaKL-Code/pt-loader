@@ -302,6 +302,7 @@ export class PTPreviewViewer {
     this._drainPromise = null;
     this._drainResolve = null;
     this._drainReject = null;
+    this._renderController = null;
     this._ownedUrl = null;
     this._bindControls();
   }
@@ -341,13 +342,20 @@ export class PTPreviewViewer {
   async render({ signal } = {}) {
     this.#assertActive();
     const generation = this._generation;
-    const frame = await this.client.render(
-      this.state({ ...this.camera }, clonePreviewTransform(this.transform)),
-      { signal },
-    );
-    if (generation !== this._generation || this._disposed) return frame;
-    this.#setFrame(frame);
-    return frame;
+    const controller = signal ? null : new AbortController();
+    const renderSignal = signal ?? controller.signal;
+    if (controller) this._renderController = controller;
+    try {
+      const frame = await this.client.render(
+        this.state({ ...this.camera }, clonePreviewTransform(this.transform)),
+        { signal: renderSignal },
+      );
+      if (generation !== this._generation || this._disposed) return frame;
+      this.#setFrame(frame);
+      return frame;
+    } finally {
+      if (controller && this._renderController === controller) this._renderController = null;
+    }
   }
 
   /**
@@ -357,6 +365,10 @@ export class PTPreviewViewer {
   requestRender() {
     this.#assertActive();
     this._queued = true;
+    // A newer pointer state supersedes a frame that is still rendering. The
+    // server can use the propagated Request.signal to stop before encoding or
+    // rasterising that obsolete frame.
+    this._renderController?.abort();
     if (!this._drainPromise) {
       this._drainPromise = new Promise((resolve, reject) => {
         this._drainResolve = resolve;
@@ -373,6 +385,7 @@ export class PTPreviewViewer {
     this._disposed = true;
     this._generation += 1;
     this._queued = false;
+    this._renderController?.abort();
     this._unbindControls?.();
     if (this._ownedUrl && typeof URL.revokeObjectURL === 'function')
       URL.revokeObjectURL(this._ownedUrl);
@@ -395,7 +408,13 @@ export class PTPreviewViewer {
     try {
       while (this._queued && !this._disposed) {
         this._queued = false;
-        lastFrame = await this.render();
+        try {
+          lastFrame = await this.render();
+        } catch (error) {
+          if (isAbortError(error) && !this._disposed) continue;
+          if (isAbortError(error) && this._disposed) return;
+          throw error;
+        }
         if (this._queued) await nextFrame();
       }
       this._drainResolve?.(lastFrame);
@@ -523,6 +542,10 @@ function clonePreviewTransform(value) {
     out[key] = values.map(Number);
   }
   return out;
+}
+
+function isAbortError(error) {
+  return error?.name === 'AbortError' || error?.code === 'ABORT_ERR';
 }
 
 function resolvePreviewElement(target) {

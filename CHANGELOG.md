@@ -14,6 +14,9 @@ the project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Preview viewers now abort obsolete in-flight frames, and preview server
+  callbacks receive the validated viewport plus an abort signal so CPU
+  renderers can skip stale work before rasterisation or image encoding.
 - The example integration now consumes the package preview abstraction instead
   of duplicating browser interaction code.
 - Pushes to `main` now create a matching GitHub Release after publishing the
