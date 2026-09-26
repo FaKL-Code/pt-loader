@@ -32,6 +32,7 @@ export class PTViewer {
    * @param {number} [opts.fov=45]
    * @param {number} [opts.exposure=1]
    * @param {object} [opts.options] build options forwarded to the loader
+   * @param {object} [opts.transform] default root position, rotation and scale
    */
   constructor(
     target,
@@ -48,6 +49,7 @@ export class PTViewer {
       fov = 45,
       exposure = 1,
       options = {},
+      transform = undefined,
       highlight = {},
     } = {},
   ) {
@@ -56,7 +58,15 @@ export class PTViewer {
     this.container = el;
 
     this.loader =
-      loader ?? new PTLoader({ baseUrl, manifest, fetch: fetchImpl, requestInit, options });
+      loader ??
+      new PTLoader({
+        baseUrl,
+        manifest,
+        fetch: fetchImpl,
+        requestInit,
+        options,
+        transform,
+      });
     this.autoRotate = autoRotate;
     this.autoRotateSpeed = autoRotateSpeed;
 
@@ -127,10 +137,13 @@ export class PTViewer {
    * @param {string} [opts.clip] clip to play for a character; defaults to the
    *   first of Idle / Walk / Full that exists
    * @param {boolean} [opts.frame=true] fit the camera to the loaded object
+   * @param {object} [opts.transform] root position, rotation and scale override
    * @returns {Promise<THREE.Object3D>}
    */
-  async show(path, { kind = 'model', clip, frame = true, ...rest } = {}) {
+  async show(path, { kind = 'model', clip, frame = true, transform, ...rest } = {}) {
     this.clear();
+
+    if (transform !== undefined) rest.transform = transform;
 
     let object;
     if (kind === 'character') {

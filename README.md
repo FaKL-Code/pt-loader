@@ -177,6 +177,25 @@ renderer.setAnimationLoop(() => {
 });
 ```
 
+Quando um item foi exportado fora da posição esperada, passe uma transformação
+de raiz sem alterar o `.smd`. A mesma opção funciona para itens, personagens e
+mapas:
+
+```js
+const item = await loader.loadModel('items/it0123.smd', {
+  transform: {
+    position: [0, 0.12, 0],
+    rotation: [0, Math.PI / 2, 0], // radianos, XYZ
+    scale: 0.85,
+  },
+});
+```
+
+`position` e `rotation` usam três números `[x, y, z]` (ou `{ x, y, z }`) e
+`scale` aceita um número uniforme ou três números. A transformação é aplicada
+depois da conversão de eixos do jogo e também pode ser definida como padrão em
+`new PTLoader({ transform })` ou `new PTViewer(..., { transform })`.
+
 `loader.update()` is only needed if your assets include animated materials. It
 is cheap and safe to call unconditionally.
 
@@ -284,6 +303,12 @@ const image = document.querySelector('#item-preview');
 const preview = new PTPreviewViewer(image, { client });
 await preview.open('item_123', { width: 640, height: 480 });
 
+await preview.setTransform({
+  position: [0, 0.12, 0],
+  rotation: [0, Math.PI / 2, 0],
+  scale: 0.85,
+});
+
 // Drag to orbit, right-drag/Shift+drag to pan and wheel to zoom.
 // Only image frames reach the browser; the viewer coalesces requests while
 // the server is rendering.
@@ -295,7 +320,10 @@ preview.dispose();
 owns pointer capture, disables the browser's native image drag, handles touch
 and wheel input, and ignores stale frames after a session is replaced. Use
 `PTPreviewClient` directly only when the application needs a custom input
-surface or transport.
+surface or transport. Its default render state contains both `camera` and
+`transform`; a private renderer can apply the latter with `applyPTTransform`
+from the package before drawing each frame. This keeps server-side and
+client-side positioning on the same contract.
 
 The `pt-preview-v1` contract is intentionally asset-agnostic:
 
@@ -606,6 +634,7 @@ Pass as `new PTLoader({ options })` or per call as `loadModel(path, { options })
 | `lighting`        | `'unshaded'` | `'unshaded'` → `MeshBasicMaterial` (matches the game); `'lambert'` reacts to scene lights                                                                            |
 | `alphaTest`       | `0.5`        | Cutout threshold                                                                                                                                                     |
 | `vertexColors`    | `false`      | Feed baked map vertex colours into the geometry (stage only)                                                                                                         |
+| `transform`       | —            | Root `position`, Euler `rotation` (radians) and `scale` applied after game-axis conversion                                                                           |
 
 **`lighting`.** The game's textures already have shadow baked in and the
 original engine renders unshaded. `'unshaded'` is the faithful choice; adding

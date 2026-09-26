@@ -265,7 +265,8 @@ export class PTPreviewViewer {
    * @param {object} options
    * @param {PTPreviewClient} options.client preview client used for frames
    * @param {Partial<typeof DEFAULT_PREVIEW_CAMERA>} [options.camera]
-   * @param {(camera: Record<string, number>) => Record<string, unknown>} [options.state]
+   * @param {object} [options.transform] root position, rotation and scale sent to the server
+   * @param {(camera: Record<string, number>, transform: object) => Record<string, unknown>} [options.state]
    * @param {(error: unknown) => void} [options.onError]
    */
   constructor(
@@ -273,7 +274,11 @@ export class PTPreviewViewer {
     {
       client,
       camera = {},
-      state = (nextCamera) => ({ camera: { ...nextCamera } }),
+      transform = {},
+      state = (nextCamera, nextTransform) => ({
+        camera: { ...nextCamera },
+        transform: clonePreviewTransform(nextTransform),
+      }),
       onError = undefined,
     } = {},
   ) {
@@ -288,6 +293,7 @@ export class PTPreviewViewer {
     this.element = element;
     this.client = client;
     this.camera = { ...DEFAULT_PREVIEW_CAMERA, ...camera };
+    this.transform = clonePreviewTransform(transform);
     this.state = state;
     this.onError = onError;
     this._disposed = false;
@@ -319,6 +325,13 @@ export class PTPreviewViewer {
     return render ? this.requestRender() : Promise.resolve(null);
   }
 
+  /** Update the root transform sent to the private renderer. */
+  setTransform(values, { render = true } = {}) {
+    this.#assertActive();
+    this.transform = clonePreviewTransform(values);
+    return render ? this.requestRender() : Promise.resolve(null);
+  }
+
   /** Restore the default orbit camera. */
   resetCamera({ render = true } = {}) {
     return this.setCamera(DEFAULT_PREVIEW_CAMERA, { render });
@@ -328,7 +341,10 @@ export class PTPreviewViewer {
   async render({ signal } = {}) {
     this.#assertActive();
     const generation = this._generation;
-    const frame = await this.client.render(this.state({ ...this.camera }), { signal });
+    const frame = await this.client.render(
+      this.state({ ...this.camera }, clonePreviewTransform(this.transform)),
+      { signal },
+    );
     if (generation !== this._generation || this._disposed) return frame;
     this.#setFrame(frame);
     return frame;
@@ -480,6 +496,33 @@ export class PTPreviewViewer {
       image.removeEventListener('dragstart', onDragStart);
     };
   }
+}
+
+function clonePreviewTransform(value) {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError('pt-loader: preview transform must be an object');
+  }
+  const out = {};
+  for (const key of ['position', 'rotation', 'scale']) {
+    if (value[key] === undefined) continue;
+    const input = value[key];
+    const values =
+      typeof input === 'number'
+        ? [input, input, input]
+        : Array.isArray(input)
+          ? input
+          : [input?.x, input?.y, input?.z];
+    if (
+      values.length !== 3 ||
+      !values.every((item) => Number.isFinite(Number(item))) ||
+      (key === 'scale' && values.some((item) => Number(item) <= 0))
+    ) {
+      throw new TypeError(`pt-loader: preview transform ${key} must contain three finite numbers`);
+    }
+    out[key] = values.map(Number);
+  }
+  return out;
 }
 
 function resolvePreviewElement(target) {

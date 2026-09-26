@@ -16,6 +16,7 @@ import type {
   PTHighlightOptions,
   PTLoader,
   PTPickResult,
+  PTTransform,
 } from './index.js';
 
 export interface PTViewerOptions {
@@ -35,6 +36,8 @@ export interface PTViewerOptions {
   fov?: number;
   exposure?: number;
   options?: PTBuildOptions;
+  /** Default root position, rotation and scale for every shown asset. */
+  transform?: PTTransform;
   /** Colours and behaviour of the pick outline. */
   highlight?: PTHighlightOptions;
 }
@@ -74,6 +77,7 @@ export class PTViewer {
       frame?: boolean;
       textureFolder?: string;
       options?: PTBuildOptions;
+      transform?: PTTransform;
     },
   ): Promise<Object3D>;
 

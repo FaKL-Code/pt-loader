@@ -14,6 +14,8 @@ import { buildBones, createSkeleton, mapVertexBones } from './skeleton.js';
 /** Rotation that maps the game's Z-up authoring space to three.js's Y-up. */
 export const UP_AXIS_FIX = -Math.PI / 2;
 
+const transformBases = new WeakMap();
+
 /**
  * Compute final vertex positions for one `GeomObject`.
  *
@@ -90,6 +92,7 @@ function applyObjectTRS(node, obj) {
  * @param {boolean} [opts.options.smoothNormals=false]
  * @param {'pose'|'matrix'} [opts.options.bindInverses='pose']
  * @param {'unshaded'|'lambert'} [opts.options.lighting='unshaded']
+ * @param {object} [opts.options.transform] root position, rotation and scale
  * @returns {THREE.Group}
  */
 export function buildModel(
@@ -103,6 +106,7 @@ export function buildModel(
     bindInverses = 'pose',
     lighting = 'unshaded',
     alphaTest = 0.5,
+    transform = null,
   } = options;
 
   const root = new THREE.Group();
@@ -195,6 +199,7 @@ export function buildModel(
   }
 
   attachUpdater(root, animators);
+  if (transform) applyPTTransform(root, transform);
   return root;
 }
 
@@ -212,6 +217,7 @@ export function buildModel(
  * @param {boolean} [opts.options.vertexColors=false]
  * @param {boolean} [opts.options.smoothNormals=false]
  * @param {'unshaded'|'lambert'} [opts.options.lighting='unshaded']
+ * @param {object} [opts.options.transform] root position, rotation and scale
  * @returns {THREE.Group}
  */
 export function buildStage(stage, { resolveTextures, name = 'STAGE3D', options = {} }) {
@@ -220,6 +226,7 @@ export function buildStage(stage, { resolveTextures, name = 'STAGE3D', options =
     smoothNormals = false,
     lighting = 'unshaded',
     alphaTest = 0.5,
+    transform = null,
   } = options;
 
   const root = new THREE.Group();
@@ -277,7 +284,83 @@ export function buildStage(stage, { resolveTextures, name = 'STAGE3D', options =
   root.userData.ptLights = stage.lights;
   root.userData.ptRect = stage.rect;
   attachUpdater(root, animators);
+  if (transform) applyPTTransform(root, transform);
   return root;
+}
+
+/**
+ * Apply a consumer-owned transform to a loaded root object.
+ *
+ * The baseline transform is captured once, making repeated calls idempotent.
+ * This is useful for server-rendered previews where every camera frame carries
+ * the current transform in its JSON state.
+ *
+ * @param {import('three').Object3D} object
+ * @param {{position?: number[]|{x:number,y:number,z:number}, rotation?: number[]|{x:number,y:number,z:number}, scale?: number|number[]|{x:number,y:number,z:number}}} [transform]
+ * @returns {import('three').Object3D}
+ */
+export function applyPTTransform(object, transform = {}) {
+  if (
+    !object ||
+    typeof object !== 'object' ||
+    !object.position ||
+    !object.rotation ||
+    !object.scale
+  ) {
+    throw new TypeError('pt-loader: transform target must be a three.js Object3D');
+  }
+  if (transform === null || typeof transform !== 'object' || Array.isArray(transform)) {
+    throw new TypeError('pt-loader: transform must be an object');
+  }
+
+  let base = transformBases.get(object);
+  if (!base) {
+    base = {
+      position: object.position.clone(),
+      rotation: object.rotation.clone(),
+      scale: object.scale.clone(),
+    };
+    transformBases.set(object, base);
+  }
+
+  const position = vector3From(transform.position, [0, 0, 0], 'position');
+  const rotation = vector3From(transform.rotation, [0, 0, 0], 'rotation');
+  const scale = vector3From(transform.scale, [1, 1, 1], 'scale', true);
+
+  object.position.set(
+    base.position.x + position[0],
+    base.position.y + position[1],
+    base.position.z + position[2],
+  );
+  object.rotation.set(
+    base.rotation.x + rotation[0],
+    base.rotation.y + rotation[1],
+    base.rotation.z + rotation[2],
+  );
+  object.scale.set(base.scale.x * scale[0], base.scale.y * scale[1], base.scale.z * scale[2]);
+  object.updateMatrixWorld(true);
+  return object;
+}
+
+function vector3From(value, fallback, name, positive = false) {
+  if (value === undefined || value === null) return fallback;
+  const values =
+    typeof value === 'number'
+      ? [value, value, value]
+      : Array.isArray(value)
+        ? value
+        : [value.x, value.y, value.z];
+  if (
+    !Array.isArray(values) ||
+    values.length !== 3 ||
+    !values.every((item) => Number.isFinite(Number(item))) ||
+    (positive && values.some((item) => Number(item) <= 0))
+  ) {
+    throw new TypeError(
+      `pt-loader: transform ${name} must contain three ${positive ? 'positive ' : ''}finite numbers`,
+    );
+  }
+  return values.map(Number);
 }
 
 /**

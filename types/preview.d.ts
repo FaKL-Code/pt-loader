@@ -1,4 +1,4 @@
-import type { PTAssetRequestInit } from './index.js';
+import type { PTAssetRequestInit, PTTransform } from './index.js';
 
 export const PT_PREVIEW_PROTOCOL: 'pt-preview-v1';
 
@@ -46,7 +46,9 @@ export interface PTPreviewCamera {
 export interface PTPreviewViewerOptions {
   client: PTPreviewClient;
   camera?: Partial<PTPreviewCamera>;
-  state?: (camera: PTPreviewCamera) => Record<string, unknown>;
+  /** Root transform sent in the default server-render state. */
+  transform?: PTTransform;
+  state?: (camera: PTPreviewCamera, transform: PTTransform) => Record<string, unknown>;
   onError?: (error: unknown) => void;
 }
 
@@ -87,11 +89,13 @@ export class PTPreviewViewer {
   readonly element: HTMLElement;
   readonly client: PTPreviewClient;
   readonly camera: PTPreviewCamera;
+  readonly transform: PTTransform;
   open(assetId: string, options?: PTPreviewOpenOptions): Promise<PTPreviewFrame | null>;
   setCamera(
     values: Partial<PTPreviewCamera>,
     options?: { render?: boolean },
   ): Promise<PTPreviewFrame | null>;
+  setTransform(values: PTTransform, options?: { render?: boolean }): Promise<PTPreviewFrame | null>;
   resetCamera(options?: { render?: boolean }): Promise<PTPreviewFrame | null>;
   render(options?: { signal?: AbortSignal }): Promise<PTPreviewFrame>;
   requestRender(): Promise<PTPreviewFrame | null>;

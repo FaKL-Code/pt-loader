@@ -22,6 +22,8 @@ the project follows [Semantic Versioning](https://semver.org/).
   `id-token` permission.
 - Added a release-discipline check requiring documentation changes alongside
   package, type, build or CI changes.
+- The local release-discipline check now includes staged and working-tree
+  changes, matching the enforcement performed in CI.
 
 ## [0.1.2] - 2026-09-11
 

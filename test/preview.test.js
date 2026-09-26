@@ -213,11 +213,14 @@ test('preview viewer owns pointer controls and coalesces server frames', async (
   image.dispatch('pointermove', pointer({ pointerId: 1, clientX: 220, clientY: 80 }));
   image.dispatch('pointerup', pointer({ pointerId: 1, clientX: 220, clientY: 80 }));
   await new Promise((resolve) => setTimeout(resolve, 10));
+  await viewer.setTransform({ position: [1, 2, 3], rotation: [0, 0.1, 0], scale: 1.25 });
 
   assert.equal(image.draggable, false);
   assert.ok(viewer.camera.azimuth > 0.9);
   assert.ok(states.length >= 2);
   assert.deepEqual(states.at(-1).camera, viewer.camera);
+  assert.deepEqual(states.at(-1).transform.position, [1, 2, 3]);
+  assert.deepEqual(viewer.transform.scale, [1.25, 1.25, 1.25]);
   viewer.dispose();
 });
 

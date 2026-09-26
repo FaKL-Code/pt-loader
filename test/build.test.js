@@ -17,13 +17,31 @@ import {
   shouldSkipMaterial,
   windEffectOf,
 } from '../src/build/materials.js';
-import { buildModel, buildStage, buildCollisionMesh } from '../src/build/model.js';
+import {
+  applyPTTransform,
+  buildModel,
+  buildStage,
+  buildCollisionMesh,
+} from '../src/build/model.js';
 import { extractBoneTracks, buildClips } from '../src/build/animation.js';
 import { BLEND, SCRIPT, FRAMES_PER_SECOND } from '../src/formats/constants.js';
 
 import { buildPAT3D, buildSTAGE3D, buildSMB, buildINX } from './helpers/write.js';
 
 const NO_TEX = () => ({ diffuse: null, lightmap: null, anim: [], diffuseHasAlpha: false });
+
+test('applyPTTransform is relative to the original root and idempotent', () => {
+  const root = new THREE.Group();
+  root.rotation.x = -Math.PI / 2;
+
+  applyPTTransform(root, { position: [1, 2, 3], rotation: [0.1, 0.2, 0.3], scale: 2 });
+  applyPTTransform(root, { position: [4, 5, 6], rotation: [0, 0, 0], scale: 1 });
+
+  assert.deepEqual(root.position.toArray(), [4, 5, 6]);
+  assert.deepEqual(root.scale.toArray(), [1, 1, 1]);
+  assert.ok(Math.abs(root.rotation.x + Math.PI / 2) < 1e-6);
+  assert.ok(Math.abs(root.rotation.y) < 1e-6);
+});
 
 // ------------------------------------------------------------------ math ---
 

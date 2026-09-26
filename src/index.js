@@ -6,7 +6,12 @@ import { fetchAsset, readResponseBytes, readResponseText } from './io/fetch.js';
 import { buildModel, buildStage, buildCollisionMesh } from './build/model.js';
 import { buildClips } from './build/animation.js';
 import { pickAt } from './build/picking.js';
-export { PTPreviewClient, PTPreviewError, PT_PREVIEW_PROTOCOL } from './preview.js';
+export {
+  PTPreviewClient,
+  PTPreviewError,
+  PTPreviewViewer,
+  PT_PREVIEW_PROTOCOL,
+} from './preview.js';
 import {
   dirOf,
   baseOf,
@@ -23,6 +28,7 @@ export {
   buildModel,
   buildStage,
   buildCollisionMesh,
+  applyPTTransform,
   UP_AXIS_FIX,
   UNIT_SCALE,
 } from './build/model.js';
@@ -83,6 +89,7 @@ export class PTLoader {
    * @param {number} [opts.maxManifestBytes=4194304] maximum manifest response size
    * @param {number} [opts.maxBufferCacheBytes=67108864] memory retained by parsed input buffers
    * @param {object} [opts.options] defaults for every build; see `buildModel`
+   * @param {object} [opts.transform] default root position, rotation and scale
    */
   constructor({
     baseUrl = '',
@@ -95,13 +102,14 @@ export class PTLoader {
     maxManifestBytes = 4 * 1024 * 1024,
     maxBufferCacheBytes = 64 * 1024 * 1024,
     options = {},
+    transform = undefined,
   } = {}) {
     this.baseUrl = baseUrl;
     validateManifest(manifest);
     this.manifest = manifest;
     this.fetch = fetchImpl ?? ((...a) => globalThis.fetch(...a));
     this.requestInit = requestInit;
-    this.options = options;
+    this.options = transform === undefined ? options : { ...options, transform };
     assertPositiveLimit(maxAssetBytes, 'maxAssetBytes');
     assertPositiveLimit(maxManifestBytes, 'maxManifestBytes');
     assertPositiveLimit(maxBufferCacheBytes, 'maxBufferCacheBytes');
@@ -111,7 +119,7 @@ export class PTLoader {
     this.textures =
       textureCache ??
       new TextureCache({
-        ...options,
+        ...this.options,
         baseUrl,
         manifest,
         fetch: this.fetch,
@@ -295,18 +303,21 @@ export class PTLoader {
    * @param {object} [opts]
    * @param {string} [opts.textureFolder] override where textures are looked up
    * @param {object} [opts.options] per-call build options
+   * @param {object} [opts.transform] root position, rotation and scale override
    * @returns {Promise<THREE.Group>}
    */
-  async loadModel(path, { textureFolder, options } = {}) {
+  async loadModel(path, { textureFolder, options, transform } = {}) {
     const smd = changeExt(path, 'smd');
     const pat = await this.parsePAT3D(smd);
     const folder = textureFolder ?? dirOf(smd);
     const textures = await this.textures.loadMaterialGroup(pat.materialGroup, folder);
 
+    const buildOptions = { ...this.options, ...options };
+    if (transform !== undefined) buildOptions.transform = transform;
     const root = buildModel(pat, {
       resolveTextures: (m, i) => textures.get(i) ?? EMPTY_TEX,
       name: stripExt(smd),
-      options: { ...this.options, ...options },
+      options: buildOptions,
     });
     root.userData.ptSource = smd;
     this.updatables.add(root);
@@ -322,6 +333,7 @@ export class PTLoader {
    * @param {string} path
    * @param {object} [opts]
    * @param {object} [opts.options]
+   * @param {object} [opts.transform] root position, rotation and scale override
    * @returns {Promise<{
    *   object: THREE.Group,
    *   clips: Record<string, THREE.AnimationClip>,
@@ -334,7 +346,7 @@ export class PTLoader {
    *   play: (name: string, mixer?: THREE.AnimationMixer) => THREE.AnimationAction|null
    * }>}
    */
-  async loadCharacter(path, { options } = {}) {
+  async loadCharacter(path, { options, transform } = {}) {
     const folder = dirOf(path);
     let inx = null;
 
@@ -373,11 +385,13 @@ export class PTLoader {
     const pat = await this.parsePAT3D(smdPath);
     const textures = await this.textures.loadMaterialGroup(pat.materialGroup, dirOf(smdPath));
 
+    const buildOptions = { ...this.options, ...options };
+    if (transform !== undefined) buildOptions.transform = transform;
     const object = buildModel(pat, {
       resolveTextures: (m, i) => textures.get(i) ?? EMPTY_TEX,
       skeletonPat,
       name: stripExt(smdPath),
-      options: { ...this.options, ...options },
+      options: buildOptions,
     });
     object.userData.ptSource = smdPath;
     this.updatables.add(object);
@@ -417,18 +431,21 @@ export class PTLoader {
    * @param {object} [opts]
    * @param {string} [opts.textureFolder] swap the texture pack without touching the map
    * @param {object} [opts.options]
+   * @param {object} [opts.transform] root position, rotation and scale override
    * @returns {Promise<THREE.Group>}
    */
-  async loadStage(path, { textureFolder, options } = {}) {
+  async loadStage(path, { textureFolder, options, transform } = {}) {
     const smd = changeExt(path, 'smd');
     const stage = await this.parseSTAGE3D(smd);
     const folder = textureFolder ?? dirOf(smd);
     const textures = await this.textures.loadMaterialGroup(stage.materialGroup, folder);
 
+    const buildOptions = { ...this.options, ...options };
+    if (transform !== undefined) buildOptions.transform = transform;
     const root = buildStage(stage, {
       resolveTextures: (m, i) => textures.get(i) ?? EMPTY_TEX,
       name: stripExt(smd),
-      options: { ...this.options, ...options },
+      options: buildOptions,
     });
     root.userData.ptSource = smd;
     this.updatables.add(root);

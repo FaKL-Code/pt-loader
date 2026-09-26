@@ -4,7 +4,7 @@ import * as THREE from 'three';
 
 import { PTLoader } from '../src/index.js';
 import { encryptBMP } from '../src/io/crypto.js';
-import { buildPAT3D, buildSMB, buildINX, buildBMP } from './helpers/write.js';
+import { buildPAT3D, buildSMB, buildINX, buildSTAGE3D, buildBMP } from './helpers/write.js';
 
 const RED = [255, 0, 0];
 const GREEN = [0, 255, 0];
@@ -22,6 +22,7 @@ function makeFakeServer() {
   const files = new Map([
     ['items/it0123.smd', buildPAT3D()],
     ['items/test.bmp', encryptedBmp.buffer.slice(0)],
+    ['field/test.smd', buildSTAGE3D()],
 
     ['char/hero.inx', buildINX({ motions: [{ state: 0x040, startTick: 0, endTick: 2 }] })],
     ['char/hero.smd', buildPAT3D({ physique: 0x5000, boneNames: ['Bip01', 'Bip01', 'Bip01'] })],
@@ -92,6 +93,30 @@ test('end to end: an unresolved texture falls back to the checker, not an error'
   assert.equal(meshes[0].material.map.name, 'pt_missing', 'the checker keeps its own name');
   assert.equal(meshes[0].material.map.image.width, 2, 'the 2x2 checker stands in');
   assert.ok(loader.textures.missingPaths.size > 0, 'the unresolved name is recorded once');
+
+  loader.dispose();
+});
+
+test('root transform is available for items, characters and maps', async () => {
+  const { fetchImpl, manifest } = makeFakeServer();
+  const loader = new PTLoader({ baseUrl: '/pt-assets/', manifest, fetch: fetchImpl });
+
+  const item = await loader.loadModel('items/it0123.smd', {
+    transform: { position: [3, 4, 5], rotation: [0.1, 0.2, 0.3], scale: 2 },
+  });
+  assert.deepEqual(item.position.toArray(), [3, 4, 5]);
+  assert.deepEqual(item.scale.toArray(), [2, 2, 2]);
+  assert.ok(Math.abs(item.rotation.y - 0.2) < 1e-6);
+
+  const character = await loader.loadCharacter('char/hero.inx', {
+    transform: { position: { x: -2, y: 1, z: 0 } },
+  });
+  assert.deepEqual(character.object.position.toArray(), [-2, 1, 0]);
+
+  const stage = await loader.loadStage('field/test.smd', {
+    transform: { scale: [0.5, 1, 1.5] },
+  });
+  assert.deepEqual(stage.scale.toArray(), [0.5, 1, 1.5]);
 
   loader.dispose();
 });

@@ -387,6 +387,15 @@ export function resolveAssetPath(
 // three.js build layer
 // ===========================================================================
 
+export type PTVector3 = [number, number, number] | { x: number; y: number; z: number };
+
+/** Root transform applied after the game asset's coordinate conversion. Angles are radians. */
+export interface PTTransform {
+  position?: PTVector3;
+  rotation?: PTVector3;
+  scale?: number | PTVector3;
+}
+
 /** Textures already resolved for one material. */
 export interface PTResolvedTextures {
   diffuse: Texture | null;
@@ -416,6 +425,8 @@ export interface PTBuildOptions {
   alphaTest?: number;
   /** Feed `StageVertex` colours into the geometry. Stage only. Default `false`. */
   vertexColors?: boolean;
+  /** Root position, Euler rotation (radians) and scale applied to the loaded object. */
+  transform?: PTTransform;
 }
 
 /** A per-frame updater for a scrolling, flipbook, water or wind effect. */
@@ -457,6 +468,9 @@ export function buildStage(
 ): Group;
 
 export function buildCollisionMesh(parsed: PTStage3D | PTPat3D): Mesh | null;
+
+/** Apply a root transform relative to the asset's original transform. */
+export function applyPTTransform(object: Object3D, transform?: PTTransform): Object3D;
 
 export function buildGeometry(opts: {
   faces: PTFace[] | PTStageFace[];
@@ -724,6 +738,8 @@ export interface PTLoaderOptions {
   /** Bound retained input-buffer memory. Default `64 MiB`. */
   maxBufferCacheBytes?: number;
   options?: PTBuildOptions & TextureCacheOptions;
+  /** Default root position, rotation and scale for every loaded object. */
+  transform?: PTTransform;
 }
 
 export interface PTCharacter {
@@ -770,16 +786,19 @@ export class PTLoader {
   /** A drop item, weapon or scenery prop. */
   loadModel(
     path: string,
-    opts?: { textureFolder?: string; options?: PTBuildOptions },
+    opts?: { textureFolder?: string; options?: PTBuildOptions; transform?: PTTransform },
   ): Promise<Group>;
 
   /** A player, NPC or monster, with its animation clips. */
-  loadCharacter(path: string, opts?: { options?: PTBuildOptions }): Promise<PTCharacter>;
+  loadCharacter(
+    path: string,
+    opts?: { options?: PTBuildOptions; transform?: PTTransform },
+  ): Promise<PTCharacter>;
 
   /** A map (STAGE3D). */
   loadStage(
     path: string,
-    opts?: { textureFolder?: string; options?: PTBuildOptions },
+    opts?: { textureFolder?: string; options?: PTBuildOptions; transform?: PTTransform },
   ): Promise<Group>;
 
   /** An invisible mesh of collidable faces, for raycasting. */

@@ -15,10 +15,13 @@ function gitDiff(args) {
   }
 }
 
-let changed = base && !/^0+$/.test(base) ? gitDiff([`${base}...HEAD`]) : gitDiff(['HEAD^', 'HEAD']);
+let changed =
+  base && !/^0+$/.test(base)
+    ? gitDiff([`${base}...HEAD`])
+    : [...gitDiff(['HEAD']), ...gitDiff(['--cached'])];
 
 if (changed.length === 0) {
-  changed = [...new Set([...gitDiff([]), ...gitDiff(['--cached'])])];
+  changed = gitDiff(['HEAD^', 'HEAD']);
 }
 
 const packageFiles = changed.filter((file) => packageChanges.test(file));
